@@ -12,12 +12,12 @@ struct qxc_parser {
     size_t itoken;
 };
 
-#define EXPECT(EXPR, ERRMSG)         \
-    do {                             \
-        if (!(EXPR)) {               \
-            fprintf(stderr, ERRMSG); \
-            return NULL;             \
-        }                            \
+#define EXPECT(EXPR, ERRMSG)              \
+    do {                                  \
+        if (!(EXPR)) {                    \
+            fprintf(stderr, ERRMSG "\n"); \
+            return NULL;                  \
+        }                                 \
     } while (0)
 
 static struct qxc_token* qxc_parser_next_token(struct qxc_parser* parser) {
@@ -41,15 +41,11 @@ static struct qxc_token* qxc_parser_expect_keyword(
     struct qxc_parser* parser, enum qxc_keyword expected_keyword) {
     struct qxc_token* next_token = qxc_parser_next_token(parser);
 
-    if (next_token->type == qxc_keyword_token &&
-        next_token->keyword == expected_keyword) {
-        parser->itoken++;
-        return next_token;
-    } else {
-        qxc_token_print(next_token);
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(next_token->type == qxc_keyword_token, "Expected keyword token");
+    EXPECT(next_token->keyword == expected_keyword, "Unexpected keyword token");
+
+    parser->itoken++;
+    return next_token;
 }
 
 static struct qxc_token* qxc_parser_expect_identifier(
@@ -71,10 +67,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(
     struct qxc_token* return_value_token =
         qxc_parser_expect_token_type(parser, qxc_integer_literal_token);
 
-    if (!return_value_token) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(return_value_token, "Expected integer literal in return value.");
 
     struct qxc_ast_expression_node* expr =
         qxc_malloc(sizeof(struct qxc_ast_expression_node));
@@ -147,6 +140,8 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
 
     return node;
 }
+
+void qxc_program_free(struct qxc_program* program) {}
 
 struct qxc_program* qxc_parse(const char* filepath) {
     struct qxc_parser* parser = qxc_malloc(sizeof(struct qxc_parser));

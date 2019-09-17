@@ -15,7 +15,10 @@ enum qxc_token_type {
     qxc_invalid_token_type
 };
 
-enum qxc_keyword { qxc_return_keyword, qxc_int_keyword };
+enum qxc_keyword { qxc_return_keyword, qxc_int_keyword, qxc_num_keywords, qxc_not_a_keyword };
+
+const char* qxc_keyword_to_str(enum qxc_keyword keyword);
+enum qxc_keyword qxc_str_to_keyword(const char* kstr);
 
 struct qxc_token {
     enum qxc_token_type type;

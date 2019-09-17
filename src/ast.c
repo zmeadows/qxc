@@ -12,162 +12,129 @@ struct qxc_parser {
     size_t itoken;
 };
 
-#define EXPECT(EXPR, ERRMSG)              \
-    do {                                  \
-        if (!(EXPR)) {                    \
-            fprintf(stderr, ERRMSG "\n"); \
-            return NULL;                  \
-        }                                 \
+#define EXPECT(EXPR, ...)                                                  \
+    do {                                                                   \
+        if (!(EXPR)) {                                                     \
+            fprintf(stderr, "%s:%d:%s(): ", __FILE__, __LINE__, __func__); \
+            fprintf(stderr, __VA_ARGS__);                                  \
+            fprintf(stderr, "\n");                                         \
+            return NULL;                                                   \
+        }                                                                  \
     } while (0)
 
-static struct qxc_token* qxc_parser_next_token(struct qxc_parser* parser) {
-    return &parser->token_buffer->tokens[parser->itoken];
-}
-
-static struct qxc_token* qxc_parser_expect_token_type(
-    struct qxc_parser* parser, enum qxc_token_type expected_token_type) {
-    struct qxc_token* next_token = qxc_parser_next_token(parser);
-
-    if (next_token->type == expected_token_type) {
-        parser->itoken++;
-        return next_token;
-    } else {
-        printf("%d\n", __LINE__);
+static struct qxc_token* step_next_token(struct qxc_parser* parser)
+{
+    if (parser->itoken < parser->token_buffer->length) {
+        return &parser->token_buffer->tokens[parser->itoken++];
+    }
+    else {
         return NULL;
     }
 }
 
-static struct qxc_token* qxc_parser_expect_keyword(
-    struct qxc_parser* parser, enum qxc_keyword expected_keyword) {
-    struct qxc_token* next_token = qxc_parser_next_token(parser);
-
-    EXPECT(next_token->type == qxc_keyword_token, "Expected keyword token");
-    EXPECT(next_token->keyword == expected_keyword, "Unexpected keyword token");
-
-    parser->itoken++;
+static struct qxc_token* qxc_parser_expect_token_type(struct qxc_parser* parser,
+                                                      enum qxc_token_type expected_token_type)
+{
+    struct qxc_token* next_token = step_next_token(parser);
+    EXPECT(next_token && next_token->type == expected_token_type, "Unexpected token type encountered");
     return next_token;
 }
 
-static struct qxc_token* qxc_parser_expect_identifier(
-    struct qxc_parser* parser, const char* expected_identifier) {
-    struct qxc_token* next_token = qxc_parser_next_token(parser);
+static struct qxc_token* qxc_parser_expect_keyword(struct qxc_parser* parser,
+                                                   enum qxc_keyword expected_keyword)
+{
+    struct qxc_token* next_token = step_next_token(parser);
 
-    if (next_token->type == qxc_identifier_token &&
-        strs_are_equal(next_token->name, expected_identifier)) {
-        parser->itoken++;
-        return next_token;
-    } else {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(next_token && next_token->type == qxc_keyword_token, "Expected keyword token");
+    EXPECT(next_token->keyword == expected_keyword, "Unexpected keyword token: %s",
+           qxc_keyword_to_str(next_token->keyword));
+
+    return next_token;
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression(
-    struct qxc_parser* parser) {
-    struct qxc_token* return_value_token =
-        qxc_parser_expect_token_type(parser, qxc_integer_literal_token);
+static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
+                                                      const char* expected_identifier)
+{
+    struct qxc_token* next_token = step_next_token(parser);
+
+    EXPECT(next_token->type == qxc_identifier_token && strs_are_equal(next_token->name, expected_identifier),
+           "Expected identifier");
+
+    return next_token;
+}
+
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser)
+{
+    struct qxc_token* return_value_token = qxc_parser_expect_token_type(parser, qxc_integer_literal_token);
 
     EXPECT(return_value_token, "Expected integer literal in return value.");
 
-    struct qxc_ast_expression_node* expr =
-        qxc_malloc(sizeof(struct qxc_ast_expression_node));
-
+    struct qxc_ast_expression_node* expr = qxc_malloc(sizeof(struct qxc_ast_expression_node));
     expr->type = qxc_int_literal_expr;
     expr->value = return_value_token->value;
 
-    if (!qxc_parser_expect_token_type(parser, qxc_semicolon_token)) {
-        fprintf(stderr, "Expected semicolon after return value");
-        return NULL;
-    }
-
-    if (!qxc_parser_expect_token_type(parser, qxc_close_brace_token)) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_semicolon_token), "Missing semicolon");
 
     return expr;
 }
 
-static struct qxc_ast_statement_node* qxc_parse_statement(
-    struct qxc_parser* parser) {
-    if (!qxc_parser_expect_keyword(parser, qxc_return_keyword)) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
+{
+    EXPECT(qxc_parser_expect_keyword(parser, qxc_return_keyword),
+           "Only return statements currently allowed.");
 
-    struct qxc_ast_statement_node* statement =
-        qxc_malloc(sizeof(struct qxc_ast_statement_node));
+    struct qxc_ast_statement_node* statement = qxc_malloc(sizeof(struct qxc_ast_statement_node));
 
     statement->type = qxc_return_statement;
     statement->expr = qxc_parse_expression(parser);
 
-    if (!statement->expr) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(statement->expr, "Expression parsing failed");
 
     return statement;
 }
 
-static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
-    struct qxc_parser* parser, const char* func_name) {
-    if (!qxc_parser_expect_token_type(parser, qxc_open_paren_token)) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+static struct qxc_ast_function_decl_node* qxc_parse_function_decl(struct qxc_parser* parser,
+                                                                  const char* func_name)
+{
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_paren_token), "Missing open parenthesis");
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_close_paren_token), "Missing close parenthesis");
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_brace_token), "Missing open brace token");
 
-    if (!qxc_parser_expect_token_type(parser, qxc_close_paren_token)) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
-
-    if (!qxc_parser_expect_token_type(parser, qxc_open_brace_token)) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
-
-    struct qxc_ast_function_decl_node* node =
-        qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
+    struct qxc_ast_function_decl_node* node = qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
 
     node->name = func_name;
 
     node->statement = qxc_parse_statement(parser);
 
-    if (!node->statement) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(node->statement, "failed to parse function body");
+
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_close_brace_token), "Missing close brace token");
 
     return node;
 }
 
-void qxc_program_free(struct qxc_program* program) {}
+// TODO
+// void qxc_program_free(struct qxc_program* program) {}
 
-struct qxc_program* qxc_parse(const char* filepath) {
+struct qxc_program* qxc_parse(const char* filepath)
+{
     struct qxc_parser* parser = qxc_malloc(sizeof(struct qxc_parser));
 
     parser->token_buffer = qxc_tokenize(filepath);
     assert(parser->token_buffer);
     parser->itoken = 0;
 
-    if (!qxc_parser_expect_keyword(parser, qxc_int_keyword)) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(qxc_parser_expect_keyword(parser, qxc_int_keyword),
+           "Invalid main type signature, must return int.");
 
-    if (!qxc_parser_expect_identifier(parser, "main")) {
-        printf("%d\n", __LINE__);
-        return NULL;
-    }
+    EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");
 
-    struct qxc_ast_function_decl_node* main_decl =
-        qxc_parse_function_decl(parser, "main");
+    struct qxc_ast_function_decl_node* main_decl = qxc_parse_function_decl(parser, "main");
 
-    if (!main_decl) {
-        return NULL;
-    }
+    EXPECT(main_decl, "Failed to parse main function declaration");
 
     struct qxc_program* program = qxc_malloc(sizeof(struct qxc_program));
+    program->main_decl = main_decl;
 
     return program;
 }

@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #define QXC_MEMORY_POOL_SIZE_BYTES (size_t)1e6
 

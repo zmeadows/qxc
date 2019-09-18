@@ -72,8 +72,10 @@ int main(int argc, char* argv[])
     // }
 
     struct qxc_program* program = qxc_parse(input_filepath);
-    printf("ast ptr = %p\n", (void*)program);
-    print_program(program);
+    if (program == NULL) {
+        return EXIT_FAILURE;
+    }
+    // print_program(program);
 
     bool codegen_success = generate_asm(program, output_assembly_path);
 

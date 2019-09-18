@@ -1,11 +1,14 @@
 #include "allocator.h"
 #include "ast.h"
+#include "codegen.h"
 #include "lexer.h"
+#include "pretty_print_ast.h"
 
 #include <assert.h>
 #include <stdio.h>
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
     assert(argc == 2);
     qxc_memory_reserve();
 
@@ -15,8 +18,11 @@ int main(int argc, char* argv[]) {
     //     qxc_token_print(&tokens->tokens[i]);
     // }
 
-    struct qxc_program* ast = qxc_parse(argv[1]);
-    printf("ast ptr = %p\n", (void*)ast);
+    struct qxc_program* program = qxc_parse(argv[1]);
+    printf("ast ptr = %p\n", (void*)program);
+    print_program(program);
+
+    generate_asm(program, "assembly.s");
 
     qxc_memory_release();
 }

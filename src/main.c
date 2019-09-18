@@ -6,10 +6,18 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 int main(int argc, char* argv[])
 {
     assert(argc == 2);
+
+    if (access(argv[1], R_OK) == -1) {
+        fprintf(stderr, "Failed to open file\n");
+        return EXIT_FAILURE;
+    }
+
     qxc_memory_reserve();
 
     // struct qxc_token_buffer* tokens = qxc_tokenize(argv[1]);

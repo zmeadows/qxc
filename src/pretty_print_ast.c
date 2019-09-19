@@ -16,7 +16,13 @@ static void print_expression(struct qxc_ast_expression_node* node)
 {
     switch (node->type) {
         case qxc_int_literal_expr:
-            PPRINT("Int<%d>\n", node->value);
+            PPRINT("Int<%d>\n", node->int_literal_value);
+            break;
+        case qxc_unary_op_expr:
+            PPRINT("UnaryOp<%c>:\n", qxc_unary_op_to_char(node->op));
+            indent_level++;
+            print_expression(node->child_expr);
+            indent_level--;
             break;
         default:
             printf("\nunrecognized expression type\n");
@@ -28,7 +34,7 @@ static void print_statement(struct qxc_ast_statement_node* node)
 {
     switch (node->type) {
         case qxc_return_statement:
-            PPRINT("RETURN:\n");
+            PPRINT("Return:\n");
             indent_level++;
             print_expression(node->expr);
             indent_level--;
@@ -44,7 +50,7 @@ static void print_function_decl(struct qxc_ast_function_decl_node* node)
 {
     PPRINT("FUNC NAME: %s\n", node->name);
     indent_level++;
-    PPRINT("FUNC RETURN TYPE: INT\n");
+    PPRINT("FUNC RETURN TYPE: Int\n");
     PPRINT("PARAMS: ()\n");
     PPRINT("BODY:\n");
     indent_level++;

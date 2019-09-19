@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "codegen.h"
 #include "lexer.h"
+#include "prelude.h"
 #include "pretty_print_ast.h"
 
 #include <assert.h>
@@ -12,19 +13,6 @@
 #include <unistd.h>
 
 #define MAX_PATH_LEN ((size_t)1024)
-
-void strip_ext(char* fname)
-{
-    char* end = fname + strlen(fname);
-
-    while (end > fname && *end != '.') {
-        --end;
-    }
-
-    if (end > fname) {
-        *end = '\0';
-    }
-}
 
 int main(int argc, char* argv[])
 {
@@ -77,23 +65,25 @@ int main(int argc, char* argv[])
     }
     // print_program(program);
 
-    bool codegen_success = generate_asm(program, output_assembly_path);
+    const bool codegen_success = generate_asm(program, output_assembly_path);
 
-    if (codegen_success) {
-        char nasm_cmd[MAX_PATH_LEN * 3];
-        sprintf(nasm_cmd, "nasm -felf64 %s -o %s", output_assembly_path, output_object_path);
-        if (system(nasm_cmd) != 0) {
-            fprintf(stderr, "NASM ASSEMBLER FAILED\n");
-            return EXIT_FAILURE;
-        }
+    if (!codegen_success) {
+        return EXIT_FAILURE;
+    }
 
-        char ld_cmd[MAX_PATH_LEN * 3];
-        sprintf(ld_cmd, "ld %s -o %s", output_object_path, output_exe_path);
+    char nasm_cmd[MAX_PATH_LEN * 3];
+    sprintf(nasm_cmd, "nasm -felf64 %s -o %s", output_assembly_path, output_object_path);
+    if (system(nasm_cmd) != 0) {
+        fprintf(stderr, "NASM ASSEMBLER FAILED\n");
+        return EXIT_FAILURE;
+    }
 
-        if (system(ld_cmd) != 0) {
-            fprintf(stderr, "LD LINKER FAILED\n");
-            return EXIT_FAILURE;
-        }
+    char ld_cmd[MAX_PATH_LEN * 3];
+    sprintf(ld_cmd, "ld %s -o %s", output_object_path, output_exe_path);
+
+    if (system(ld_cmd) != 0) {
+        fprintf(stderr, "LD LINKER FAILED\n");
+        return EXIT_FAILURE;
     }
 
     qxc_memory_release();

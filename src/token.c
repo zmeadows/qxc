@@ -33,9 +33,38 @@ enum qxc_keyword qxc_str_to_keyword(const char* kstr)
     }
 }
 
+char qxc_unary_op_to_char(enum qxc_unary_op op)
+{
+    switch (op) {
+        case qxc_negation_unary_op:
+            return '-';
+        case qxc_logical_negation_unary_op:
+            return '!';
+        case qxc_bitwise_complement_unary_op:
+            return '~';
+        default:
+            return '\0';
+    }
+}
+
+enum qxc_unary_op qxc_char_to_unary_op(char opch)
+{
+    switch (opch) {
+        case '-':
+            return qxc_negation_unary_op;
+        case '!':
+            return qxc_logical_negation_unary_op;
+        case '~':
+            return qxc_bitwise_complement_unary_op;
+        default:
+            return qxc_not_a_unary_op;
+    }
+}
+
 void qxc_token_print(struct qxc_token* token)
 {
     printf("%d:%d ", token->line, token->column);
+
     switch (token->type) {
         case qxc_open_brace_token:
             printf("{");
@@ -53,13 +82,16 @@ void qxc_token_print(struct qxc_token* token)
             printf(";");
             break;
         case qxc_keyword_token:
-            printf("keyword: %s", token->name);
+            printf("keyword: %s", qxc_keyword_to_str(token->keyword));
             break;
         case qxc_identifier_token:
             printf("identifier: %s", token->name);
             break;
         case qxc_integer_literal_token:
             printf("integer literal: %d", token->value);
+            break;
+        case qxc_unary_op_token:
+            printf("unary op: %c", qxc_unary_op_to_char(token->unary_op));
             break;
         default:
             printf("unrecognized/invalid token type");

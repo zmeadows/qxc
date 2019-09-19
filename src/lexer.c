@@ -98,6 +98,17 @@ static void qxc_consume_single_char_token(struct qxc_tokenizer* tokenizer,
     qxc_tokenizer_advance(tokenizer);
 }
 
+static void qxc_consume_unary_op_token(struct qxc_tokenizer* tokenizer, struct qxc_token_buffer* token_buffer,
+                                       enum qxc_unary_op op)
+{
+    struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
+    new_token->type = qxc_unary_op_token;
+    new_token->unary_op = op;
+    new_token->line = tokenizer->current_line;
+    new_token->column = tokenizer->current_column;
+    qxc_tokenizer_advance(tokenizer);
+}
+
 struct qxc_token_buffer* qxc_tokenize(const char* filepath)
 {
     debug_print("starting lexer for file: %s\n", filepath);
@@ -148,6 +159,18 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
 
         else if (tokenizer.next_char == ';') {
             qxc_consume_single_char_token(&tokenizer, token_buffer, qxc_semicolon_token);
+        }
+
+        else if (tokenizer.next_char == '-') {
+            qxc_consume_unary_op_token(&tokenizer, token_buffer, qxc_negation_unary_op);
+        }
+
+        else if (tokenizer.next_char == '!') {
+            qxc_consume_unary_op_token(&tokenizer, token_buffer, qxc_logical_negation_unary_op);
+        }
+
+        else if (tokenizer.next_char == '~') {
+            qxc_consume_unary_op_token(&tokenizer, token_buffer, qxc_bitwise_complement_unary_op);
         }
 
         else if (tokenizer.next_char == '\n') {

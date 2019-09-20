@@ -29,35 +29,75 @@ enum qxc_keyword qxc_str_to_keyword(const char* kstr)
         return qxc_int_keyword;
     }
     else {
-        return qxc_not_a_keyword;
+        return qxc_invalid_keyword;
     }
 }
 
-char qxc_unary_op_to_char(enum qxc_unary_op op)
+// TODO: conver to const char* since eventually we'll have operators with >1 character
+char qxc_operator_to_char(enum qxc_operator op)
 {
     switch (op) {
-        case qxc_negation_unary_op:
+        case qxc_minus_op:
             return '-';
-        case qxc_logical_negation_unary_op:
+        case qxc_plus_op:
+            return '+';
+        case qxc_divide_op:
+            return '/';
+        case qxc_multiply_op:
+            return '*';
+        case qxc_exclamation_op:
             return '!';
-        case qxc_bitwise_complement_unary_op:
+        case qxc_complement_op:
             return '~';
         default:
             return '\0';
     }
 }
 
-enum qxc_unary_op qxc_char_to_unary_op(char opch)
+enum qxc_operator char_to_qxc_operator(char opch)
 {
     switch (opch) {
         case '-':
-            return qxc_negation_unary_op;
+            return qxc_minus_op;
+        case '+':
+            return qxc_plus_op;
+        case '/':
+            return qxc_divide_op;
+        case '*':
+            return qxc_multiply_op;
         case '!':
-            return qxc_logical_negation_unary_op;
+            return qxc_exclamation_op;
         case '~':
-            return qxc_bitwise_complement_unary_op;
+            return qxc_complement_op;
         default:
-            return qxc_not_a_unary_op;
+            return qxc_invalid_op;
+    }
+}
+
+// TODO: eventually multiply_op will serve as unary pointer dereference operator as well
+bool qxc_operator_can_be_unary(enum qxc_operator op)
+{
+    switch (op) {
+        case qxc_minus_op:
+            return true;
+        case qxc_exclamation_op:
+            return true;
+        case qxc_complement_op:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool qxc_operator_is_always_unary(enum qxc_operator op)
+{
+    switch (op) {
+        case qxc_exclamation_op:
+            return true;
+        case qxc_complement_op:
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -88,10 +128,10 @@ void qxc_token_print(struct qxc_token* token)
             printf("identifier: %s", token->name);
             break;
         case qxc_integer_literal_token:
-            printf("integer literal: %d", token->value);
+            printf("integer literal: %d", token->int_literal_value);
             break;
-        case qxc_unary_op_token:
-            printf("unary op: %c", qxc_unary_op_to_char(token->unary_op));
+        case qxc_operator_token:
+            printf("operator: %c", qxc_operator_to_char(token->op));
             break;
         default:
             printf("unrecognized/invalid token type");
@@ -121,11 +161,14 @@ struct qxc_token* qxc_token_buffer_extend(struct qxc_token_buffer* buffer)
     }
 
     struct qxc_token* new_token = &buffer->tokens[buffer->length];
-    new_token->type = qxc_invalid_token_type;
+    new_token->type = qxc_invalid_token;
     new_token->line = -1;
     new_token->column = -1;
     new_token->name[0] = '\0';
-    new_token->value = 0;
+    new_token->int_literal_value = 0;
+    new_token->keyword = qxc_invalid_keyword;
+    new_token->op = qxc_invalid_op;
+
     buffer->length++;
     return new_token;
 }

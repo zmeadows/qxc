@@ -14,16 +14,38 @@
 
 #define MAX_PATH_LEN ((size_t)1024)
 
+enum qxc_mode { qxc_tokenize_mode, qxc_compile_mode };
+
 int main(int argc, char* argv[])
 {
-    if (argc != 2) {
-        fprintf(stderr, "Invalid number of arguments, should be 2.\n");
+    if (argc < 2) {
+        fprintf(stderr, "Need at least two arguments!\n");
         return EXIT_FAILURE;
     }
 
-    const char* input_filepath = argv[1];
+    const char* input_filepath = NULL;
+    enum qxc_mode MODE = qxc_compile_mode;
+    bool verbose = false;
 
-    if (access(input_filepath, R_OK) == -1) {
+    for (int i = 1; i < argc; i++) {
+        const char* ith_arg = argv[i];
+
+        if (access(ith_arg, R_OK) == -1) {
+            if (strs_are_equal("-t", ith_arg)) {
+                MODE = qxc_tokenize_mode;
+            }
+            else if (strs_are_equal("-v", ith_arg)) {
+                verbose = true;
+            }
+        }
+        else {
+            input_filepath = ith_arg;
+        }
+    }
+
+    printf("input filepath: %s\n", input_filepath);
+
+    if (input_filepath == NULL) {
         fprintf(stderr, "Failed to open file\n");
         return EXIT_FAILURE;
     }
@@ -53,17 +75,27 @@ int main(int argc, char* argv[])
 
     qxc_memory_reserve();
 
-    // struct qxc_token_buffer* tokens = qxc_tokenize(argv[1]);
-    // printf("=== TOKENS ===\n");
-    // for (size_t i = 0; i < tokens->length; i++) {
-    //     qxc_token_print(&tokens->tokens[i]);
-    // }
+    if (MODE == qxc_tokenize_mode) {
+        struct qxc_token_buffer* tokens = qxc_tokenize(input_filepath);
+        if (tokens == NULL) {
+            fprintf(stderr, "lexure failure\n");
+            return EXIT_FAILURE;
+        }
+        printf("=== TOKENS ===\n");
+        for (size_t i = 0; i < tokens->length; i++) {
+            qxc_token_print(&tokens->tokens[i]);
+        }
+        return EXIT_SUCCESS;
+    }
 
     struct qxc_program* program = qxc_parse(input_filepath);
     if (program == NULL) {
         return EXIT_FAILURE;
     }
-    // print_program(program);
+
+    if (verbose) {
+        print_program(program);
+    }
 
     const bool codegen_success = generate_asm(program, output_assembly_path);
 

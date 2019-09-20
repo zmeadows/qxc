@@ -1,7 +1,35 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 
+enum qxc_keyword {
+    qxc_return_keyword,
+    qxc_int_keyword,
+    qxc_keyword_count,
+    qxc_invalid_keyword
+};
+
+const char* qxc_keyword_to_str(enum qxc_keyword keyword);
+enum qxc_keyword qxc_str_to_keyword(const char* kstr);
+
+enum qxc_operator {
+    qxc_minus_op,
+    qxc_plus_op,
+    qxc_divide_op,
+    qxc_multiply_op,
+    qxc_exclamation_op,
+    qxc_complement_op,
+    qxc_operator_count,
+    qxc_invalid_op
+};
+
+char qxc_operator_to_char(enum qxc_operator op);
+enum qxc_operator char_to_qxc_operator(char opch);
+bool qxc_operator_can_be_unary(enum qxc_operator op);
+bool qxc_operator_is_always_unary(enum qxc_operator op);
+
+// TODO: symbol token
 enum qxc_token_type {
     qxc_close_brace_token,
     qxc_close_paren_token,
@@ -10,24 +38,11 @@ enum qxc_token_type {
     qxc_keyword_token,
     qxc_open_brace_token,
     qxc_open_paren_token,
+    qxc_operator_token,
     qxc_semicolon_token,
-    qxc_unary_op_token,
-    qxc_num_token_types,
-    qxc_invalid_token_type
+    qxc_token_type_count,
+    qxc_invalid_token
 };
-
-enum qxc_keyword { qxc_return_keyword, qxc_int_keyword, qxc_num_keywords, qxc_not_a_keyword };
-
-enum qxc_unary_op {
-    qxc_negation_unary_op,
-    qxc_logical_negation_unary_op,
-    qxc_bitwise_complement_unary_op,
-    qxc_num_unary_ops,
-    qxc_not_a_unary_op
-};
-
-char qxc_unary_op_to_char(enum qxc_unary_op op);
-enum qxc_unary_op qxc_char_to_unary_op(char opch);
 
 struct qxc_token {
     enum qxc_token_type type;
@@ -35,15 +50,12 @@ struct qxc_token {
     int column;
 
     union {
-        char name[256];
+        char name[256];  // TODO use const char* and qxc_malloc
         int int_literal_value;
         enum qxc_keyword keyword;
-        enum qxc_unary_op unary_op;
+        enum qxc_operator op;
     };
 };
-
-const char* qxc_keyword_to_str(enum qxc_keyword keyword);
-enum qxc_keyword qxc_str_to_keyword(const char* kstr);
 
 void qxc_token_print(struct qxc_token* token);
 

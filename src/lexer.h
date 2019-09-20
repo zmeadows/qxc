@@ -2,4 +2,6 @@
 
 #include "token.h"
 
-struct qxc_token_buffer* qxc_tokenize(const char* filepath, struct qxc_error* err);
+#include "prelude.h"
+
+struct qxc_token_buffer* qxc_tokenize(const char* filepath);

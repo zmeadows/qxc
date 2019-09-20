@@ -42,8 +42,8 @@ static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 //     }
 // }
 
-static struct qxc_token* qxc_parser_expect_token_type(struct qxc_parser* parser,
-                                                      enum qxc_token_type expected_token_type)
+static struct qxc_token* qxc_parser_expect_token_type(
+    struct qxc_parser* parser, enum qxc_token_type expected_token_type)
 {
     struct qxc_token* next_token = pop_next_token(parser);
     EXPECT(next_token && next_token->type == expected_token_type,
@@ -80,21 +80,24 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
     struct qxc_token* next_token = pop_next_token(parser);
     EXPECT(next_token, "File ended too soon");
 
-    struct qxc_ast_expression_node* expr = qxc_malloc(sizeof(struct qxc_ast_expression_node));
+    struct qxc_ast_expression_node* expr =
+        qxc_malloc(sizeof(struct qxc_ast_expression_node));
 
     switch (next_token->type) {
         case qxc_integer_literal_token:
             expr->type = qxc_int_literal_expr;
             expr->int_literal_value = next_token->int_literal_value;
 
-            EXPECT(qxc_parser_expect_token_type(parser, qxc_semicolon_token), "Missing semicolon");
+            EXPECT(qxc_parser_expect_token_type(parser, qxc_semicolon_token),
+                   "Missing semicolon");
             break;
 
-        case qxc_unary_op_token:
+        case qxc_operator_token:
             expr->type = qxc_unary_op_expr;
-            expr->op = next_token->unary_op;
+            expr->unary_op = next_token->op;
             expr->child_expr = qxc_parse_expression(parser);
-            EXPECT(expr->child_expr, "Failed to parse child expression of unary operator");
+            EXPECT(expr->child_expr,
+                   "Failed to parse child expression of unary operator");
             break;
 
         default:
@@ -109,7 +112,8 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
     EXPECT(qxc_parser_expect_keyword(parser, qxc_return_keyword),
            "Only return statements currently allowed.");
 
-    struct qxc_ast_statement_node* statement = qxc_malloc(sizeof(struct qxc_ast_statement_node));
+    struct qxc_ast_statement_node* statement =
+        qxc_malloc(sizeof(struct qxc_ast_statement_node));
 
     statement->type = qxc_return_statement;
     statement->expr = qxc_parse_expression(parser);
@@ -119,15 +123,18 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
     return statement;
 }
 
-static struct qxc_ast_function_decl_node* qxc_parse_function_decl(struct qxc_parser* parser,
-                                                                  const char* func_name)
+static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
+    struct qxc_parser* parser, const char* func_name)
 {
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_paren_token), "Missing open parenthesis");
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_paren_token),
+           "Missing open parenthesis");
     EXPECT(qxc_parser_expect_token_type(parser, qxc_close_paren_token),
            "Missing close parenthesis");
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_brace_token), "Missing open brace token");
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_brace_token),
+           "Missing open brace token");
 
-    struct qxc_ast_function_decl_node* node = qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
+    struct qxc_ast_function_decl_node* node =
+        qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
 
     node->name = func_name;
 
@@ -147,9 +154,10 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(struct qxc_par
 struct qxc_program* qxc_parse(const char* filepath)
 {
     struct qxc_parser* parser = qxc_malloc(sizeof(struct qxc_parser));
-
     parser->token_buffer = qxc_tokenize(filepath);
-    assert(parser->token_buffer);
+    if (!parser->token_buffer) {
+        return NULL;
+    }
     parser->itoken = 0;
 
     EXPECT(qxc_parser_expect_keyword(parser, qxc_int_keyword),
@@ -157,7 +165,8 @@ struct qxc_program* qxc_parse(const char* filepath)
 
     EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");
 
-    struct qxc_ast_function_decl_node* main_decl = qxc_parse_function_decl(parser, "main");
+    struct qxc_ast_function_decl_node* main_decl =
+        qxc_parse_function_decl(parser, "main");
 
     EXPECT(main_decl, "Failed to parse main function declaration");
 

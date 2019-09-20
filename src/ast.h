@@ -1,15 +1,11 @@
 #pragma once
 
+#include "prelude.h"
 #include "token.h"
 
 enum qxc_expr_type { qxc_int_literal_expr, qxc_unary_op_expr };
 
 struct qxc_ast_expression_node;
-
-struct qxc_ast_unary_op_node {
-    enum qxc_unary_op op;
-    struct qxc_ast_expression_node* expr;
-};
 
 struct qxc_ast_expression_node {
     enum qxc_expr_type type;
@@ -17,7 +13,7 @@ struct qxc_ast_expression_node {
     union {
         int int_literal_value;
         struct {
-            enum qxc_unary_op op;
+            enum qxc_operator unary_op;
             struct qxc_ast_expression_node* child_expr;
         };
     };

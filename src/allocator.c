@@ -66,5 +66,6 @@ void qxc_memory_reserve(void)
     }
 }
 
+// TODO: print memory use statistics
 void qxc_memory_release(void) { qxc_memory_pool_release(s_pool); }
 

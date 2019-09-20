@@ -13,3 +13,5 @@ qxc
 *.s
 *.asm
 *.o
+
+.gdb_history

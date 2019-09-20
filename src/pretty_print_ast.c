@@ -19,7 +19,7 @@ static void print_expression(struct qxc_ast_expression_node* node)
             PPRINT("Int<%d>\n", node->int_literal_value);
             break;
         case qxc_unary_op_expr:
-            PPRINT("UnaryOp<%c>:\n", qxc_unary_op_to_char(node->op));
+            PPRINT("UnaryOp<%c>:\n", qxc_operator_to_char(node->unary_op));
             indent_level++;
             print_expression(node->child_expr);
             indent_level--;

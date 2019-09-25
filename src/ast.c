@@ -22,6 +22,13 @@ struct qxc_parser {
         }                                                                  \
     } while (0)
 
+#define EXPECT_(EXPR)    \
+    do {                 \
+        if (!(EXPR)) {   \
+            return NULL; \
+        }                \
+    } while (0)
+
 static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 {
     if (parser->itoken < parser->token_buffer->length) {
@@ -32,22 +39,21 @@ static struct qxc_token* pop_next_token(struct qxc_parser* parser)
     }
 }
 
-// static struct qxc_token* peek_next_token(struct qxc_parser* parser)
-// {
-//     if (parser->itoken < parser->token_buffer->length) {
-//         return &parser->token_buffer->tokens[parser->itoken];
-//     }
-//     else {
-//         return NULL;
-//     }
-// }
+static struct qxc_token* peek_next_token(struct qxc_parser* parser)
+{
+    if (parser->itoken < parser->token_buffer->length) {
+        return &parser->token_buffer->tokens[parser->itoken];
+    }
+    else {
+        return NULL;
+    }
+}
 
 static struct qxc_token* qxc_parser_expect_token_type(
     struct qxc_parser* parser, enum qxc_token_type expected_token_type)
 {
     struct qxc_token* next_token = pop_next_token(parser);
-    EXPECT(next_token && next_token->type == expected_token_type,
-           "Unexpected token type encountered");
+    EXPECT_(next_token && next_token->type == expected_token_type);
     return next_token;
 }
 
@@ -75,33 +81,122 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
     return next_token;
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser)
+static inline bool is_plus_minus_token(struct qxc_token* token)
 {
-    struct qxc_token* next_token = pop_next_token(parser);
-    EXPECT(next_token, "File ended too soon");
+    return token->type == qxc_operator_token &&
+           (token->op == qxc_minus_op || token->op == qxc_plus_op);
+}
 
+static inline bool is_divide_multiply_token(struct qxc_token* token)
+{
+    return token->type == qxc_operator_token &&
+           (token->op == qxc_divide_op || token->op == qxc_multiply_op);
+}
+
+static inline struct qxc_ast_expression_node* new_expr_node(void)
+{
     struct qxc_ast_expression_node* expr =
         qxc_malloc(sizeof(struct qxc_ast_expression_node));
+    expr->type = INVALID_EXPR;
+    return expr;
+}
 
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser);
+
+static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parser)
+{
+    struct qxc_ast_expression_node* factor = new_expr_node();
+
+    struct qxc_token* next_token = pop_next_token(parser);
     switch (next_token->type) {
         case qxc_integer_literal_token:
-            expr->type = qxc_int_literal_expr;
-            expr->int_literal_value = next_token->int_literal_value;
+            factor->type = INT_LITERAL_EXPR;
+            factor->literal = next_token->int_literal_value;
 
-            EXPECT(qxc_parser_expect_token_type(parser, qxc_semicolon_token),
-                   "Missing semicolon");
             break;
 
         case qxc_operator_token:
-            expr->type = qxc_unary_op_expr;
-            expr->unary_op = next_token->op;
-            expr->child_expr = qxc_parse_expression(parser);
-            EXPECT(expr->child_expr,
+            EXPECT(qxc_operator_can_be_unary(next_token->op),
+                   "non-unary operator in unary operator context: %c",
+                   qxc_operator_to_char(next_token->op));
+            factor->type = UNARY_OP_EXPR;
+            factor->unop = next_token->op;
+            factor->unary_expr = qxc_parse_factor(parser);
+            EXPECT(factor->unary_expr,
                    "Failed to parse child expression of unary operator");
+            break;
+
+        case qxc_open_paren_token:
+            factor = qxc_parse_expression(parser);
+
+            EXPECT_(factor);
+
+            EXPECT(qxc_parser_expect_token_type(parser, qxc_close_paren_token),
+                   "Missing close parenthesis after enclosed factor");
+
             break;
 
         default:
             return NULL;
+    }
+
+    return factor;
+}
+
+static struct qxc_ast_expression_node* qxc_parse_term(struct qxc_parser* parser)
+{
+    struct qxc_ast_expression_node* term = qxc_parse_factor(parser);
+    EXPECT_(term);
+
+    struct qxc_token* next_token = peek_next_token(parser);
+    EXPECT_(next_token);
+
+    while (is_divide_multiply_token(next_token)) {
+        next_token = pop_next_token(parser);
+
+        struct qxc_ast_expression_node* rhs = qxc_parse_factor(parser);
+        EXPECT_(rhs);
+
+        struct qxc_ast_expression_node* upper_term = new_expr_node();
+        upper_term->type = BINARY_OP_EXPR;
+        upper_term->binop = next_token->op;
+        upper_term->left_expr = term;
+        upper_term->right_expr = rhs;
+
+        term = upper_term;
+
+        next_token = peek_next_token(parser);
+        EXPECT_(next_token);
+    }
+
+    return term;
+}
+
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser)
+{
+    struct qxc_ast_expression_node* expr = qxc_parse_term(parser);
+    EXPECT_(expr);
+
+    struct qxc_token* next_token = peek_next_token(parser);
+    EXPECT_(next_token);
+
+    while (is_plus_minus_token(next_token)) {
+        next_token = pop_next_token(parser);
+
+        struct qxc_ast_expression_node* rhs = qxc_parse_term(parser);
+        EXPECT_(rhs);
+
+        struct qxc_ast_expression_node* upper_expr =
+            qxc_malloc(sizeof(struct qxc_ast_expression_node));
+        upper_expr->type = BINARY_OP_EXPR;
+        upper_expr->binop = next_token->op;
+        upper_expr->left_expr = expr;
+        upper_expr->right_expr = rhs;
+
+        expr = upper_expr;
+
+        next_token = peek_next_token(parser);
+        EXPECT_(next_token);
     }
 
     return expr;
@@ -115,10 +210,13 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
     struct qxc_ast_statement_node* statement =
         qxc_malloc(sizeof(struct qxc_ast_statement_node));
 
-    statement->type = qxc_return_statement;
+    statement->type = RETURN_STATEMENT;
     statement->expr = qxc_parse_expression(parser);
 
     EXPECT(statement->expr, "Expression parsing failed");
+
+    EXPECT(qxc_parser_expect_token_type(parser, qxc_semicolon_token),
+           "Missing semicolon at end of statement");
 
     return statement;
 }
@@ -173,5 +271,6 @@ struct qxc_program* qxc_parse(const char* filepath)
     struct qxc_program* program = qxc_malloc(sizeof(struct qxc_program));
     program->main_decl = main_decl;
 
+    qxc_token_buffer_free(parser->token_buffer);
     return program;
 }

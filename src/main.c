@@ -14,7 +14,7 @@
 
 #define MAX_PATH_LEN ((size_t)1024)
 
-enum qxc_mode { qxc_tokenize_mode, qxc_compile_mode };
+enum qxc_mode { qxc_tokenize_mode, qxc_parse_mode, qxc_compile_mode, qxc_unknown_mode };
 
 int main(int argc, char* argv[])
 {
@@ -33,6 +33,9 @@ int main(int argc, char* argv[])
         if (access(ith_arg, R_OK) == -1) {
             if (strs_are_equal("-t", ith_arg)) {
                 MODE = qxc_tokenize_mode;
+            }
+            else if (strs_are_equal("-p", ith_arg)) {
+                MODE = qxc_parse_mode;
             }
             else if (strs_are_equal("-v", ith_arg)) {
                 verbose = true;

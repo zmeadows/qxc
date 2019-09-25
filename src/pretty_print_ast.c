@@ -15,13 +15,20 @@ static size_t indent_level;
 static void print_expression(struct qxc_ast_expression_node* node)
 {
     switch (node->type) {
-        case qxc_int_literal_expr:
-            PPRINT("Int<%d>\n", node->int_literal_value);
+        case INT_LITERAL_EXPR:
+            PPRINT("Int<%d>\n", node->literal);
             break;
-        case qxc_unary_op_expr:
-            PPRINT("UnaryOp<%c>:\n", qxc_operator_to_char(node->unary_op));
+        case UNARY_OP_EXPR:
+            PPRINT("UnaryOp<%c>:\n", qxc_operator_to_char(node->unop));
             indent_level++;
-            print_expression(node->child_expr);
+            print_expression(node->unary_expr);
+            indent_level--;
+            break;
+        case BINARY_OP_EXPR:
+            PPRINT("BinaryOp<%c>:\n", qxc_operator_to_char(node->binop));
+            indent_level++;
+            print_expression(node->left_expr);
+            print_expression(node->right_expr);
             indent_level--;
             break;
         default:
@@ -30,13 +37,13 @@ static void print_expression(struct qxc_ast_expression_node* node)
     }
 }
 
-static void print_statement(struct qxc_ast_statement_node* node)
+static void print_statement(struct qxc_ast_statement_node* statement)
 {
-    switch (node->type) {
-        case qxc_return_statement:
+    switch (statement->type) {
+        case RETURN_STATEMENT:
             PPRINT("Return:\n");
             indent_level++;
-            print_expression(node->expr);
+            print_expression(statement->expr);
             indent_level--;
             break;
 

@@ -24,12 +24,12 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
                                     struct qxc_ast_expression_node* expr)
 {
     switch (expr->type) {
-        case qxc_int_literal_expr:
-            emit(gen, "mov rdi, %d", expr->int_literal_value);
+        case INT_LITERAL_EXPR:
+            emit(gen, "mov rdi, %d", expr->literal);
             return true;
-        case qxc_unary_op_expr:
-            generate_expression_asm(gen, expr->child_expr);
-            switch (expr->unary_op) {
+        case UNARY_OP_EXPR:
+            generate_expression_asm(gen, expr->unary_expr);
+            switch (expr->unop) {
                 case qxc_minus_op:
                     emit(gen, "neg rdi");
                     break;
@@ -45,15 +45,16 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
                     return false;
             }
             return true;
+        default:
+            return false;
     }
-    return false;
 }
 
 static bool generate_statement_asm(struct qxc_codegen* gen,
                                    struct qxc_ast_statement_node* node)
 {
     switch (node->type) {
-        case qxc_return_statement:
+        case RETURN_STATEMENT:
             emit(gen, "mov rax, 60");  // syscall for exit
             generate_expression_asm(gen, node->expr);
             emit(gen, "syscall");

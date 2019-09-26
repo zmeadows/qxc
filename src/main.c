@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("input filepath: %s\n", input_filepath);
+    // printf("input filepath: %s\n", input_filepath);
 
     if (input_filepath == NULL) {
         fprintf(stderr, "Failed to open file\n");

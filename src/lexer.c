@@ -43,9 +43,9 @@ static void qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* file
     fread(tokenizer->contents, 1, fsize, f);
     fclose(f);
 
-    printf("\n\n");
-    printf(tokenizer->contents);
-    printf("\n\n");
+    // printf("\n\n");
+    // printf(tokenizer->contents);
+    // printf("\n\n");
 
     tokenizer->id[0] = '\0';
     tokenizer->id_len = 0;

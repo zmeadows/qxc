@@ -25,26 +25,53 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
 {
     switch (expr->type) {
         case INT_LITERAL_EXPR:
-            emit(gen, "mov rdi, %d", expr->literal);
+            emit(gen, "mov rax, %d", expr->literal);
+
             return true;
+
         case UNARY_OP_EXPR:
             generate_expression_asm(gen, expr->unary_expr);
             switch (expr->unop) {
                 case qxc_minus_op:
-                    emit(gen, "neg rdi");
+                    emit(gen, "neg rax");
                     break;
                 case qxc_complement_op:
-                    emit(gen, "not rdi");
+                    emit(gen, "not rax");
                     break;
                 case qxc_exclamation_op:
-                    emit(gen, "cmp rdi, 0");
-                    emit(gen, "mov rdi, 0");
-                    emit(gen, "sete dil");
+                    emit(gen, "cmp rax, 0");
+                    emit(gen, "mov rax, 0");
+                    emit(gen, "sete al");
                     break;
                 default:
                     return false;
             }
             return true;
+
+        case BINARY_OP_EXPR:
+            generate_expression_asm(gen, expr->left_expr);
+            emit(gen, "push rax");
+            generate_expression_asm(gen, expr->right_expr);
+            emit(gen, "pop rbx");
+
+            switch (expr->binop) {
+                case qxc_plus_op:
+                    emit(gen, "add rax, rbx");
+                    break;
+                case qxc_minus_op:
+                    emit(gen, "sub rax, rbx");
+                    break;
+                case qxc_divide_op:
+                    emit(gen, "mul rbx");
+                    break;
+                case qxc_multiply_op:
+                    emit(gen, "mul rbx");
+                    break;
+                default:
+                    return false;
+            }
+            return true;
+
         default:
             return false;
     }
@@ -55,8 +82,9 @@ static bool generate_statement_asm(struct qxc_codegen* gen,
 {
     switch (node->type) {
         case RETURN_STATEMENT:
-            emit(gen, "mov rax, 60");  // syscall for exit
             generate_expression_asm(gen, node->expr);
+            emit(gen, "mov rdi, rax");
+            emit(gen, "mov rax, 60");  // syscall for exit
             emit(gen, "syscall");
             return true;
 

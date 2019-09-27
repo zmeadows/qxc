@@ -12,7 +12,7 @@ static size_t indent_level;
         printf(__VA_ARGS__);                        \
     } while (0)
 
-static void print_expression(struct qxc_ast_expression_node* node)
+void print_expression(struct qxc_ast_expression_node* node)
 {
     switch (node->type) {
         case INT_LITERAL_EXPR:

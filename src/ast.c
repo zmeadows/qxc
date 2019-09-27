@@ -2,6 +2,7 @@
 #include "allocator.h"
 #include "lexer.h"
 #include "prelude.h"
+#include "pretty_print_ast.h"
 #include "token.h"
 
 #include <assert.h>
@@ -178,7 +179,7 @@ static int binop_precedence(enum qxc_operator op)
 }
 
 static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser,
-                                                            int node_precedence)
+                                                            int min_precedence)
 {
     struct qxc_ast_expression_node* left_expr = qxc_parse_factor(parser);
     EXPECT_(left_expr);
@@ -186,20 +187,16 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
-    if (next_token->type != qxc_operator_token) {
-        return left_expr;
-    }
+    while (next_token->type == qxc_operator_token) {
+        int next_op_precedence = binop_precedence(next_token->op);
 
-    int next_op_precedence = binop_precedence(next_token->op);
-
-    while (next_token->type == qxc_operator_token &&
-           next_op_precedence >= node_precedence) {
-        node_precedence = next_op_precedence;
+        if (next_op_precedence <= min_precedence) {
+            break;
+        }
 
         next_token = pop_next_token(parser);
-
         struct qxc_ast_expression_node* right_expr =
-            qxc_parse_expression(parser, node_precedence);  // descend
+            qxc_parse_expression(parser, next_op_precedence);  // descend
         EXPECT_(right_expr);
 
         struct qxc_ast_expression_node* binop_expr = new_expr_node();

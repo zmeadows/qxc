@@ -100,11 +100,7 @@ int main(int argc, char* argv[])
         print_program(program);
     }
 
-    const bool codegen_success = generate_asm(program, output_assembly_path);
-
-    if (!codegen_success) {
-        return EXIT_FAILURE;
-    }
+    generate_asm(program, output_assembly_path);
 
     char nasm_cmd[MAX_PATH_LEN * 3];
     sprintf(nasm_cmd, "nasm -felf64 %s -o %s", output_assembly_path, output_object_path);

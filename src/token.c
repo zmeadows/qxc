@@ -180,3 +180,4 @@ struct qxc_token* qxc_token_buffer_extend(struct qxc_token_buffer* buffer)
     buffer->length++;
     return new_token;
 }
+

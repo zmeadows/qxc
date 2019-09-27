@@ -12,6 +12,8 @@ struct qxc_parser {
     size_t itoken;
 };
 
+// TODO: remove qxc_ prefix from static functions
+
 #define EXPECT(EXPR, ...)                                                  \
     do {                                                                   \
         if (!(EXPR)) {                                                     \
@@ -101,7 +103,7 @@ static inline struct qxc_ast_expression_node* new_expr_node(void)
     return expr;
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser);
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser*, int);
 
 static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parser)
 {
@@ -127,7 +129,7 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
             break;
 
         case qxc_open_paren_token:
-            factor = qxc_parse_expression(parser);
+            factor = qxc_parse_expression(parser, -1);
 
             EXPECT_(factor);
 
@@ -143,63 +145,76 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
     return factor;
 }
 
-static struct qxc_ast_expression_node* qxc_parse_term(struct qxc_parser* parser)
+static int binop_precedence(enum qxc_operator op)
 {
-    struct qxc_ast_expression_node* term = qxc_parse_factor(parser);
-    EXPECT_(term);
-
-    struct qxc_token* next_token = peek_next_token(parser);
-    EXPECT_(next_token);
-
-    while (is_divide_multiply_token(next_token)) {
-        next_token = pop_next_token(parser);
-
-        struct qxc_ast_expression_node* rhs = qxc_parse_factor(parser);
-        EXPECT_(rhs);
-
-        struct qxc_ast_expression_node* upper_term = new_expr_node();
-        upper_term->type = BINARY_OP_EXPR;
-        upper_term->binop = next_token->op;
-        upper_term->left_expr = term;
-        upper_term->right_expr = rhs;
-
-        term = upper_term;
-
-        next_token = peek_next_token(parser);
-        EXPECT_(next_token);
+    switch (op) {
+        case LOGICAL_AND_OP:
+            return 2;
+        case LOGICAL_OR_OP:
+            return 1;
+        case MULTIPLY_OP:
+            return 6;
+        case DIVIDE_OP:
+            return 6;
+        case PLUS_OP:
+            return 5;
+        case MINUS_OP:
+            return 5;
+        case EQUAL_TO_OP:
+            return 3;
+        case NOT_EQUAL_TO_OP:
+            return 3;
+        case LESS_THAN_OP:
+            return 4;
+        case LESS_THAN_OR_EQUAL_TO_OP:
+            return 4;
+        case GREATER_THAN_OP:
+            return 4;
+        case GREATER_THAN_OR_EQUAL_TO_OP:
+            return 4;
+        default:
+            return -1;
     }
-
-    return term;
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser)
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser,
+                                                            int node_precedence)
 {
-    struct qxc_ast_expression_node* expr = qxc_parse_term(parser);
-    EXPECT_(expr);
+    struct qxc_ast_expression_node* left_expr = qxc_parse_factor(parser);
+    EXPECT_(left_expr);
 
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
-    while (is_plus_minus_token(next_token)) {
+    if (next_token->type != qxc_operator_token) {
+        return left_expr;
+    }
+
+    int next_op_precedence = binop_precedence(next_token->op);
+
+    while (next_token->type == qxc_operator_token &&
+           next_op_precedence >= node_precedence) {
+        node_precedence = next_op_precedence;
+
         next_token = pop_next_token(parser);
 
-        struct qxc_ast_expression_node* rhs = qxc_parse_term(parser);
-        EXPECT_(rhs);
+        struct qxc_ast_expression_node* right_expr =
+            qxc_parse_expression(parser, node_precedence);  // descend
+        EXPECT_(right_expr);
 
-        struct qxc_ast_expression_node* upper_expr =
-            qxc_malloc(sizeof(struct qxc_ast_expression_node));
-        upper_expr->type = BINARY_OP_EXPR;
-        upper_expr->binop = next_token->op;
-        upper_expr->left_expr = expr;
-        upper_expr->right_expr = rhs;
+        struct qxc_ast_expression_node* binop_expr = new_expr_node();
+        binop_expr->type = BINARY_OP_EXPR;
+        binop_expr->binop = next_token->op;
+        binop_expr->left_expr = left_expr;
+        binop_expr->right_expr = right_expr;
 
-        expr = upper_expr;
+        left_expr = binop_expr;
 
         next_token = peek_next_token(parser);
         EXPECT_(next_token);
     }
 
-    return expr;
+    return left_expr;
 }
 
 static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
@@ -211,7 +226,7 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
         qxc_malloc(sizeof(struct qxc_ast_statement_node));
 
     statement->type = RETURN_STATEMENT;
-    statement->expr = qxc_parse_expression(parser);
+    statement->expr = qxc_parse_expression(parser, 0);
 
     EXPECT(statement->expr, "Expression parsing failed");
 

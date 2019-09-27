@@ -49,9 +49,10 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
             return true;
 
         case BINARY_OP_EXPR:
-            generate_expression_asm(gen, expr->left_expr);
-            emit(gen, "push rax");
+            // put left hand operand in rax, right hand operand in rbx
             generate_expression_asm(gen, expr->right_expr);
+            emit(gen, "push rax");
+            generate_expression_asm(gen, expr->left_expr);
             emit(gen, "pop rbx");
 
             switch (expr->binop) {
@@ -62,10 +63,11 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
                     emit(gen, "sub rax, rbx");
                     break;
                 case qxc_divide_op:
-                    emit(gen, "mul rbx");
+                    emit(gen, "xor rdx, rdx");
+                    emit(gen, "idiv rbx");
                     break;
                 case qxc_multiply_op:
-                    emit(gen, "mul rbx");
+                    emit(gen, "imul rbx");
                     break;
                 default:
                     return false;

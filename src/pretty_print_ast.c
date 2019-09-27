@@ -19,13 +19,13 @@ static void print_expression(struct qxc_ast_expression_node* node)
             PPRINT("Int<%d>\n", node->literal);
             break;
         case UNARY_OP_EXPR:
-            PPRINT("UnaryOp<%c>:\n", qxc_operator_to_char(node->unop));
+            PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop));
             indent_level++;
             print_expression(node->unary_expr);
             indent_level--;
             break;
         case BINARY_OP_EXPR:
-            PPRINT("BinaryOp<%c>:\n", qxc_operator_to_char(node->binop));
+            PPRINT("BinaryOp<%s>:\n", qxc_operator_to_str(node->binop));
             indent_level++;
             print_expression(node->left_expr);
             print_expression(node->right_expr);

@@ -32,13 +32,13 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
         case UNARY_OP_EXPR:
             generate_expression_asm(gen, expr->unary_expr);
             switch (expr->unop) {
-                case qxc_minus_op:
+                case MINUS_OP:
                     emit(gen, "neg rax");
                     break;
-                case qxc_complement_op:
+                case COMPLEMENT_OP:
                     emit(gen, "not rax");
                     break;
-                case qxc_exclamation_op:
+                case EXCLAMATION_OP:
                     emit(gen, "cmp rax, 0");
                     emit(gen, "mov rax, 0");
                     emit(gen, "sete al");
@@ -56,17 +56,17 @@ static bool generate_expression_asm(struct qxc_codegen* gen,
             emit(gen, "pop rbx");
 
             switch (expr->binop) {
-                case qxc_plus_op:
+                case PLUS_OP:
                     emit(gen, "add rax, rbx");
                     break;
-                case qxc_minus_op:
+                case MINUS_OP:
                     emit(gen, "sub rax, rbx");
                     break;
-                case qxc_divide_op:
+                case DIVIDE_OP:
                     emit(gen, "xor rdx, rdx");
                     emit(gen, "idiv rbx");
                     break;
-                case qxc_multiply_op:
+                case MULTIPLY_OP:
                     emit(gen, "imul rbx");
                     break;
                 default:

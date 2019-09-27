@@ -84,13 +84,13 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
 static inline bool is_plus_minus_token(struct qxc_token* token)
 {
     return token->type == qxc_operator_token &&
-           (token->op == qxc_minus_op || token->op == qxc_plus_op);
+           (token->op == MINUS_OP || token->op == PLUS_OP);
 }
 
 static inline bool is_divide_multiply_token(struct qxc_token* token)
 {
     return token->type == qxc_operator_token &&
-           (token->op == qxc_divide_op || token->op == qxc_multiply_op);
+           (token->op == DIVIDE_OP || token->op == MULTIPLY_OP);
 }
 
 static inline struct qxc_ast_expression_node* new_expr_node(void)
@@ -117,8 +117,8 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
 
         case qxc_operator_token:
             EXPECT(qxc_operator_can_be_unary(next_token->op),
-                   "non-unary operator in unary operator context: %c",
-                   qxc_operator_to_char(next_token->op));
+                   "non-unary operator in unary operator context: %s",
+                   qxc_operator_to_str(next_token->op));
             factor->type = UNARY_OP_EXPR;
             factor->unop = next_token->op;
             factor->unary_expr = qxc_parse_factor(parser);

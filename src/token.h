@@ -14,22 +14,29 @@ const char* qxc_keyword_to_str(enum qxc_keyword keyword);
 enum qxc_keyword qxc_str_to_keyword(const char* kstr);
 
 enum qxc_operator {
-    qxc_minus_op,
-    qxc_plus_op,
-    qxc_divide_op,
-    qxc_multiply_op,
-    qxc_exclamation_op,
-    qxc_complement_op,
-    qxc_operator_count,
-    qxc_invalid_op
+    MINUS_OP,
+    PLUS_OP,
+    DIVIDE_OP,
+    MULTIPLY_OP,
+    EXCLAMATION_OP,  // TODO: rename NEGATION_OP
+    COMPLEMENT_OP,
+    LOGICAL_AND_OP,
+    LOGICAL_OR_OP,
+    EQUAL_TO_OP,
+    NOT_EQUAL_TO_OP,
+    LESS_THAN_OP,
+    LESS_THAN_OR_EQUAL_TO_OP,
+    GREATER_THAN_OP,
+    GREATER_THAN_OR_EQUAL_TO_OP,
+    INVALID_OP
 };
 
-char qxc_operator_to_char(enum qxc_operator op);
-enum qxc_operator char_to_qxc_operator(char opch);
+const char* qxc_operator_to_str(enum qxc_operator op);
+// enum qxc_operator str_to_qxc_operator(const char* opstr);
 bool qxc_operator_can_be_unary(enum qxc_operator op);
 bool qxc_operator_is_always_unary(enum qxc_operator op);
 
-// TODO: symbol token
+// TODO: capitalize
 enum qxc_token_type {
     qxc_close_brace_token,
     qxc_close_paren_token,

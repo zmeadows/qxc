@@ -13,6 +13,8 @@
 // TODO: convert tokenizer/token_buffer to use qxc_malloc
 
 struct qxc_tokenizer {
+    // TODO: store identifiers in a hash set/table and use one pointer per identifier
+    // maybe table of const char* -> list of all locations of identifier/keyword?
     char id[QXC_MAXIMUM_IDENTIFIER_LENGTH];
     size_t id_len;
 
@@ -23,13 +25,6 @@ struct qxc_tokenizer {
     char* next_char_ptr;
     char next_char;
 };
-
-static void qxc_tokenizer_advance(struct qxc_tokenizer* tokenizer)
-{
-    tokenizer->next_char_ptr++;
-    tokenizer->next_char = *tokenizer->next_char_ptr;
-    tokenizer->current_column++;
-}
 
 static void qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* filepath)
 {
@@ -43,10 +38,6 @@ static void qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* file
     fread(tokenizer->contents, 1, fsize, f);
     fclose(f);
 
-    // printf("\n\n");
-    // printf(tokenizer->contents);
-    // printf("\n\n");
-
     tokenizer->id[0] = '\0';
     tokenizer->id_len = 0;
 
@@ -55,6 +46,13 @@ static void qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* file
 
     tokenizer->next_char_ptr = tokenizer->contents;
     tokenizer->next_char = *tokenizer->next_char_ptr;
+}
+
+static void qxc_tokenizer_advance(struct qxc_tokenizer* tokenizer)
+{
+    tokenizer->next_char_ptr++;
+    tokenizer->next_char = *tokenizer->next_char_ptr;
+    tokenizer->current_column++;
 }
 
 static void qxc_tokenizer_free(struct qxc_tokenizer* tokenizer)
@@ -72,6 +70,65 @@ static inline void qxc_tokenizer_grow_id_buffer(struct qxc_tokenizer* tokenizer)
 static inline bool is_valid_keyword_identifier_first_character(char c)
 {
     return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_'));
+}
+
+static inline bool is_valid_operator_first_character(char c)
+{
+    return c != '\0' && strchr("-+/*!~&|=<>", c) != NULL;
+}
+
+static inline bool can_be_digraph_first_character(char c) { return strchr("&|!=<>", c); }
+
+static inline enum qxc_operator try_build_digraph_operator(char c1, char c2)
+{
+    if (!can_be_digraph_first_character(c1)) return INVALID_OP;
+
+    switch (c1) {
+        case '&':
+            if (c2 == '&') return LOGICAL_AND_OP;
+            break;
+        case '|':
+            if (c2 == '|') return LOGICAL_OR_OP;
+            break;
+        case '!':
+            if (c2 == '=') return NOT_EQUAL_TO_OP;
+            break;
+        case '=':
+            if (c2 == '=') return EQUAL_TO_OP;
+            break;
+        case '<':
+            if (c2 == '=') return LESS_THAN_OR_EQUAL_TO_OP;
+            break;
+        case '>':
+            if (c2 == '=') return GREATER_THAN_OR_EQUAL_TO_OP;
+            break;
+    }
+
+    return INVALID_OP;
+}
+
+static inline enum qxc_operator build_unigraph_operator(char c)
+{
+    switch (c) {
+        case '-':
+            return MINUS_OP;
+        case '+':
+            return PLUS_OP;
+        case '/':
+            return DIVIDE_OP;
+        case '*':
+            return MULTIPLY_OP;
+        case '!':
+            return EXCLAMATION_OP;
+        case '>':
+            return GREATER_THAN_OP;
+        case '<':
+            return LESS_THAN_OP;
+        case '~':
+            return COMPLEMENT_OP;
+        default:
+            return INVALID_OP;
+    }
 }
 
 static inline bool is_valid_keyword_identifier_trailing_character(char c)
@@ -99,26 +156,57 @@ static void qxc_tokenizer_consume_id(struct qxc_tokenizer* tokenizer)
     tokenizer->id[tokenizer->id_len] = '\0';
 }
 
-static void qxc_consume_single_char_token(struct qxc_tokenizer* tokenizer,
-                                          struct qxc_token_buffer* token_buffer,
-                                          enum qxc_token_type type)
+static inline bool is_valid_symbol(char c)
+{
+    return c != '\0' && strchr("{}();", c) != NULL;
+}
+
+static void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
+                                     struct qxc_token_buffer* token_buffer)
 {
     struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
-    new_token->type = type;
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
+    switch (tokenizer->next_char) {
+        case '{':
+            new_token->type = qxc_open_brace_token;
+            break;
+        case '}':
+            new_token->type = qxc_close_brace_token;
+            break;
+        case '(':
+            new_token->type = qxc_open_paren_token;
+            break;
+        case ')':
+            new_token->type = qxc_close_paren_token;
+            break;
+        case ';':
+            new_token->type = qxc_semicolon_token;
+            break;
+        default:
+            new_token->type = qxc_invalid_token;
+            break;
+    }
     qxc_tokenizer_advance(tokenizer);
 }
 
-static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
-                                       struct qxc_token_buffer* token_buffer,
-                                       enum qxc_operator op)
+static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
+                                     struct qxc_token_buffer* token_buffer,
+                                     enum qxc_operator op)
 {
     struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
     new_token->type = qxc_operator_token;
     new_token->op = op;
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
+}
+
+// 'consume' == build + advance tokenizer
+static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
+                                       struct qxc_token_buffer* token_buffer,
+                                       enum qxc_operator op)
+{
+    qxc_build_operator_token(tokenizer, token_buffer, op);
     qxc_tokenizer_advance(tokenizer);
 }
 
@@ -154,50 +242,24 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
         }
 
         // TODO: use switch statement here
-        else if (tokenizer.next_char == '{') {
-            qxc_consume_single_char_token(&tokenizer, token_buffer, qxc_open_brace_token);
+        else if (is_valid_symbol(tokenizer.next_char)) {
+            qxc_consume_symbol_token(&tokenizer, token_buffer);
         }
 
-        else if (tokenizer.next_char == '}') {
-            qxc_consume_single_char_token(&tokenizer, token_buffer,
-                                          qxc_close_brace_token);
-        }
+        else if (is_valid_operator_first_character(tokenizer.next_char)) {
+            char c1 = tokenizer.next_char;
+            qxc_tokenizer_advance(&tokenizer);
+            char c2 = tokenizer.next_char;
 
-        else if (tokenizer.next_char == '(') {
-            qxc_consume_single_char_token(&tokenizer, token_buffer, qxc_open_paren_token);
-        }
+            enum qxc_operator op = try_build_digraph_operator(c1, c2);
 
-        else if (tokenizer.next_char == ')') {
-            qxc_consume_single_char_token(&tokenizer, token_buffer,
-                                          qxc_close_paren_token);
-        }
-
-        else if (tokenizer.next_char == ';') {
-            qxc_consume_single_char_token(&tokenizer, token_buffer, qxc_semicolon_token);
-        }
-
-        else if (tokenizer.next_char == '-') {
-            qxc_consume_operator_token(&tokenizer, token_buffer, qxc_minus_op);
-        }
-
-        else if (tokenizer.next_char == '+') {
-            qxc_consume_operator_token(&tokenizer, token_buffer, qxc_plus_op);
-        }
-
-        else if (tokenizer.next_char == '/') {
-            qxc_consume_operator_token(&tokenizer, token_buffer, qxc_divide_op);
-        }
-
-        else if (tokenizer.next_char == '*') {
-            qxc_consume_operator_token(&tokenizer, token_buffer, qxc_multiply_op);
-        }
-
-        else if (tokenizer.next_char == '!') {
-            qxc_consume_operator_token(&tokenizer, token_buffer, qxc_exclamation_op);
-        }
-
-        else if (tokenizer.next_char == '~') {
-            qxc_consume_operator_token(&tokenizer, token_buffer, qxc_complement_op);
+            if (op != INVALID_OP) {
+                qxc_consume_operator_token(&tokenizer, token_buffer, op);
+            }
+            else {
+                qxc_build_operator_token(&tokenizer, token_buffer,
+                                         build_unigraph_operator(c1));
+            }
         }
 
         else if (tokenizer.next_char == '\n') {

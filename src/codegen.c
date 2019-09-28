@@ -76,7 +76,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
                 case COMPLEMENT_OP:
                     emit(gen, "not rax");
                     break;
-                case EXCLAMATION_OP:
+                case NEGATION_OP:
                     emit(gen, "cmp rax, 0");
                     emit(gen, "mov rax, 0");
                     emit(gen, "sete al");
@@ -184,7 +184,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
 
             return;
 
-        case INVALID_EXPR:
+        default:
             // TODO: error handling
             return;
     }

@@ -2,7 +2,6 @@
 #include "allocator.h"
 #include "lexer.h"
 #include "prelude.h"
-#include "pretty_print_ast.h"
 #include "token.h"
 
 #include <assert.h>
@@ -65,7 +64,7 @@ static struct qxc_token* qxc_parser_expect_keyword(struct qxc_parser* parser,
 {
     struct qxc_token* next_token = pop_next_token(parser);
 
-    EXPECT(next_token && next_token->type == qxc_keyword_token, "Expected keyword token");
+    EXPECT(next_token && next_token->type == KEYWORD_TOKEN, "Expected keyword token");
     EXPECT(next_token->keyword == expected_keyword, "Unexpected keyword token: %s",
            qxc_keyword_to_str(next_token->keyword));
 
@@ -77,23 +76,11 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
 {
     struct qxc_token* next_token = pop_next_token(parser);
 
-    EXPECT(next_token && next_token->type == qxc_identifier_token &&
+    EXPECT(next_token && next_token->type == IDENTIFIER_TOKEN &&
                strs_are_equal(next_token->name, expected_identifier),
            "Expected identifier");
 
     return next_token;
-}
-
-static inline bool is_plus_minus_token(struct qxc_token* token)
-{
-    return token->type == qxc_operator_token &&
-           (token->op == MINUS_OP || token->op == PLUS_OP);
-}
-
-static inline bool is_divide_multiply_token(struct qxc_token* token)
-{
-    return token->type == qxc_operator_token &&
-           (token->op == DIVIDE_OP || token->op == MULTIPLY_OP);
 }
 
 static inline struct qxc_ast_expression_node* new_expr_node(void)
@@ -112,13 +99,13 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
 
     struct qxc_token* next_token = pop_next_token(parser);
     switch (next_token->type) {
-        case qxc_integer_literal_token:
+        case INTEGER_LITERAL_TOKEN:
             factor->type = INT_LITERAL_EXPR;
             factor->literal = next_token->int_literal_value;
 
             break;
 
-        case qxc_operator_token:
+        case OPERATOR_TOKEN:
             EXPECT(qxc_operator_can_be_unary(next_token->op),
                    "non-unary operator in unary operator context: %s",
                    qxc_operator_to_str(next_token->op));
@@ -129,12 +116,12 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
                    "Failed to parse child expression of unary operator");
             break;
 
-        case qxc_open_paren_token:
+        case OPEN_PAREN_TOKEN:
             factor = qxc_parse_expression(parser, -1);
 
             EXPECT_(factor);
 
-            EXPECT(qxc_parser_expect_token_type(parser, qxc_close_paren_token),
+            EXPECT(qxc_parser_expect_token_type(parser, CLOSE_PAREN_TOKEN),
                    "Missing close parenthesis after enclosed factor");
 
             break;
@@ -187,7 +174,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
-    while (next_token->type == qxc_operator_token) {
+    while (next_token->type == OPERATOR_TOKEN) {
         int next_op_precedence = binop_precedence(next_token->op);
 
         if (next_op_precedence <= min_precedence) {
@@ -216,7 +203,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
 
 static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
 {
-    EXPECT(qxc_parser_expect_keyword(parser, qxc_return_keyword),
+    EXPECT(qxc_parser_expect_keyword(parser, RETURN_KEYWORD),
            "Only return statements currently allowed.");
 
     struct qxc_ast_statement_node* statement =
@@ -227,7 +214,7 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
 
     EXPECT(statement->expr, "Expression parsing failed");
 
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_semicolon_token),
+    EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
            "Missing semicolon at end of statement");
 
     return statement;
@@ -236,11 +223,11 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
 static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
     struct qxc_parser* parser, const char* func_name)
 {
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_paren_token),
+    EXPECT(qxc_parser_expect_token_type(parser, OPEN_PAREN_TOKEN),
            "Missing open parenthesis");
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_close_paren_token),
+    EXPECT(qxc_parser_expect_token_type(parser, CLOSE_PAREN_TOKEN),
            "Missing close parenthesis");
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_open_brace_token),
+    EXPECT(qxc_parser_expect_token_type(parser, OPEN_BRACE_TOKEN),
            "Missing open brace token");
 
     struct qxc_ast_function_decl_node* node =
@@ -252,14 +239,11 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
 
     EXPECT(node->statement, "failed to parse function body");
 
-    EXPECT(qxc_parser_expect_token_type(parser, qxc_close_brace_token),
+    EXPECT(qxc_parser_expect_token_type(parser, CLOSE_BRACE_TOKEN),
            "Missing close brace token");
 
     return node;
 }
-
-// TODO
-// void qxc_program_free(struct qxc_program* program) {}
 
 struct qxc_program* qxc_parse(const char* filepath)
 {
@@ -270,7 +254,7 @@ struct qxc_program* qxc_parse(const char* filepath)
     }
     parser->itoken = 0;
 
-    EXPECT(qxc_parser_expect_keyword(parser, qxc_int_keyword),
+    EXPECT(qxc_parser_expect_keyword(parser, INT_KEYWORD),
            "Invalid main type signature, must return int.");
 
     EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");

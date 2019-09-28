@@ -76,8 +76,6 @@ int main(int argc, char* argv[])
     sprintf(output_object_path, "%s/%s.o", dname, bname);
     sprintf(output_exe_path, "%s/%s", dname, bname);
 
-    qxc_memory_reserve();
-
     if (MODE == qxc_tokenize_mode) {
         struct qxc_token_buffer* tokens = qxc_tokenize(input_filepath);
         if (tokens == NULL) {
@@ -116,6 +114,4 @@ int main(int argc, char* argv[])
         fprintf(stderr, "LD LINKER FAILED\n");
         return EXIT_FAILURE;
     }
-
-    qxc_memory_release();
 }

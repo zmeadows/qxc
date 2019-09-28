@@ -16,7 +16,7 @@ void print_expression(struct qxc_ast_expression_node* node)
 {
     switch (node->type) {
         case INT_LITERAL_EXPR:
-            PPRINT("Int<%d>\n", node->literal);
+            PPRINT("Int<%ld>\n", node->literal);
             break;
         case UNARY_OP_EXPR:
             PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop));

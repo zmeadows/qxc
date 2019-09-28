@@ -2,9 +2,11 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#define QXC_MEMORY_POOL_SIZE_BYTES ((size_t)1e6)
+// FIXME: what if user requests more than QXC_MEMORY_POOL_SIZE_BYTES with qxc_malloc?
+#define QXC_MEMORY_POOL_SIZE_BYTES ((size_t)(500e3))
 
 struct qxc_memory_pool {
     uint8_t* start;
@@ -13,11 +15,31 @@ struct qxc_memory_pool {
     struct qxc_memory_pool* next_pool;
 };
 
+static struct qxc_memory_pool* s_pool = NULL;
+
+static void qxc_memory_release(void)
+{
+    struct qxc_memory_pool* pool = s_pool;
+
+    while (pool) {
+        free(pool->start);
+        pool = pool->next_pool;
+    }
+}
+
 static struct qxc_memory_pool* qxc_memory_pool_init(void)
 {
     struct qxc_memory_pool* new_pool = malloc(sizeof(struct qxc_memory_pool));
 
     new_pool->start = calloc(QXC_MEMORY_POOL_SIZE_BYTES, 1);
+
+    if (new_pool->start == NULL) {
+        free(new_pool);
+        fprintf(stderr, "Failed to allocate memory pool for qxc! Exiting...\n");
+        exit(EXIT_FAILURE);
+        return NULL;
+    }
+
     new_pool->end = new_pool->start + QXC_MEMORY_POOL_SIZE_BYTES;
     new_pool->ptr = new_pool->start;
     new_pool->next_pool = NULL;
@@ -25,24 +47,13 @@ static struct qxc_memory_pool* qxc_memory_pool_init(void)
     return new_pool;
 }
 
-static void qxc_memory_pool_release(struct qxc_memory_pool* pool)
-{
-    while (1) {
-        free(pool->start);
-        if (pool->next_pool) {
-            pool = pool->next_pool;
-        }
-        else {
-            break;
-        }
-    }
-}
-
-static struct qxc_memory_pool* s_pool = NULL;
-
 void* qxc_malloc(size_t bytes)
 {
-    assert(s_pool != NULL);
+    if (s_pool == NULL) {
+        s_pool = qxc_memory_pool_init();
+        atexit(qxc_memory_release);
+    }
+
     struct qxc_memory_pool* pool = s_pool;
 
     while (1) {
@@ -58,14 +69,4 @@ void* qxc_malloc(size_t bytes)
         pool = pool->next_pool;
     }
 }
-
-void qxc_memory_reserve(void)
-{
-    if (!s_pool) {
-        s_pool = qxc_memory_pool_init();
-    }
-}
-
-// TODO: print memory use statistics
-void qxc_memory_release(void) { qxc_memory_pool_release(s_pool); }
 

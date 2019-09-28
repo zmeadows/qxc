@@ -1,5 +1,5 @@
 # Compiler
-CC = gcc
+CC = clang
 
 # Project name
 PROJECT = qxc
@@ -9,7 +9,26 @@ OBJDIR = obj
 SRCDIR = src
 
 # Libraries
-MYCFLAGS = -Wall -Wextra -pedantic -g -std=c11 -fno-omit-frame-pointer
+MYCFLAGS = -Wall \
+		   -Wextra \
+		   -Wconversion \
+		   -Werror \
+		   -Wstrict-prototypes \
+		   -Wshadow \
+		   -Wpointer-arith \
+		   -Wcast-qual \
+		   -Wmissing-prototypes \
+		   -Wfloat-equal \
+		   -Wunreachable-code \
+		   -Wswitch-default \
+		   -Winline \
+		   -fno-omit-frame-pointer \
+		   -fstrict-aliasing \
+		   -pedantic \
+		   -g \
+		   -Og \
+		   -std=c11 \
+
 MYLIBS   = -lm
 
 # Files and folders
@@ -26,7 +45,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -o $@ $< -c $(MYCFLAGS)
 
 clean:
-	rm $(PROJECT)
+	rm -rf $(PROJECT)
 	rm -rf $(OBJDIR)
 
 buildrepo:

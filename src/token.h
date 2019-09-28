@@ -4,10 +4,9 @@
 #include <stddef.h>
 
 enum qxc_keyword {
-    qxc_return_keyword,
-    qxc_int_keyword,
-    qxc_keyword_count,
-    qxc_invalid_keyword
+    RETURN_KEYWORD,
+    INT_KEYWORD,
+    INVALID_KEYWORD
 };
 
 const char* qxc_keyword_to_str(enum qxc_keyword keyword);
@@ -18,7 +17,7 @@ enum qxc_operator {
     PLUS_OP,
     DIVIDE_OP,
     MULTIPLY_OP,
-    EXCLAMATION_OP,  // TODO: rename NEGATION_OP
+    NEGATION_OP,
     COMPLEMENT_OP,
     LOGICAL_AND_OP,
     LOGICAL_OR_OP,
@@ -36,19 +35,17 @@ const char* qxc_operator_to_str(enum qxc_operator op);
 bool qxc_operator_can_be_unary(enum qxc_operator op);
 bool qxc_operator_is_always_unary(enum qxc_operator op);
 
-// TODO: capitalize
 enum qxc_token_type {
-    qxc_close_brace_token,
-    qxc_close_paren_token,
-    qxc_identifier_token,
-    qxc_integer_literal_token,
-    qxc_keyword_token,
-    qxc_open_brace_token,
-    qxc_open_paren_token,
-    qxc_operator_token,
-    qxc_semicolon_token,
-    qxc_token_type_count,
-    qxc_invalid_token
+    CLOSE_BRACE_TOKEN,
+    CLOSE_PAREN_TOKEN,
+    IDENTIFIER_TOKEN,
+    INTEGER_LITERAL_TOKEN,
+    KEYWORD_TOKEN,
+    OPEN_BRACE_TOKEN,
+    OPEN_PAREN_TOKEN,
+    OPERATOR_TOKEN,
+    SEMICOLON_TOKEN,
+    INVALID_TOKEN
 };
 
 struct qxc_token {
@@ -58,7 +55,7 @@ struct qxc_token {
 
     union {
         char name[256];  // TODO use const char* and qxc_malloc
-        int int_literal_value;
+        long int_literal_value;
         enum qxc_keyword keyword;
         enum qxc_operator op;
     };

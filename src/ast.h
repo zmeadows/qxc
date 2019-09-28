@@ -3,13 +3,6 @@
 #include "prelude.h"
 #include "token.h"
 
-// <program> ::= <function>
-// <function> ::= "int" <id> "(" ")" "{" <statement> "}"
-// <statement> ::= "return" <exp> ";"
-// <exp> ::= <term> { ("+" | "-") <term> }
-// <term> ::= <factor> { ("*" | "/") <factor> }
-// <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int>
-
 // --------------------------------------------------------------------------------
 
 enum qxc_expression_type {
@@ -34,7 +27,7 @@ struct qxc_ast_expression_node {
             struct qxc_ast_expression_node* unary_expr;
         };
 
-        int literal;
+        long literal;
     };
 };
 
@@ -49,12 +42,14 @@ struct qxc_ast_statement_node {
         struct qxc_ast_expression_node* expr;
     };
 };
+
 // --------------------------------------------------------------------------------
 
 struct qxc_ast_function_decl_node {
     const char* name;
     struct qxc_ast_statement_node* statement;
 };
+
 // --------------------------------------------------------------------------------
 
 struct qxc_program {  // program

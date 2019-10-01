@@ -293,7 +293,8 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
                     qxc_build_operator_token(tokenizer, token_buffer, maybe_unigraph_op);
                 }
                 else if (c1 == '=') {
-                    qxc_build_symbol_token(tokenizer, token_buffer, ASSIGNMENT_TOKEN);
+                    // FIXME: this is messy
+                    qxc_build_symbol_token(tokenizer, token_buffer, '=');
                 }
                 else {
                     fprintf(stderr, "invalid operator-like character encountered: %c\n",

@@ -1,5 +1,8 @@
 #include "prelude.h"
 
+#include <errno.h>
+#include <ftw.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,17 +22,34 @@ void strip_ext(char* fname)
     }
 }
 
-// void qxc_error_reset(struct qxc_error* error)
-// {
-//     error->code = qxc_no_error;
-//     error->line = -1;
-//     error->column = -1;
-//     error->filepath = NULL;
-//     error->description = NULL;
-// }
-//
-// void qxc_error_print(struct qxc_error* error)
-// {
-//     fprintf(stderr, "%s:%d:%d --> %s", error->filepath, error->line, error->column,
-//             error->description);
-// }
+// for make_tmp_dir below
+static int remove_callback(const char* pathname,
+                           __attribute__((unused)) const struct stat* sbuf,
+                           __attribute__((unused)) int type,
+                           __attribute__((unused)) struct FTW* ftwb)
+{
+    return remove(pathname);
+}
+
+const char* mk_tmp_dir(void)
+{
+    /* Create the temporary directory */
+    char template[] = "/tmp/qxc.XXXXXX";
+
+    const char* tmp_dirname = mkdtemp(template);
+
+    if (tmp_dirname == NULL) {
+        perror("mkdtemp failed: ");
+        return NULL;
+    }
+
+    return tmp_dirname;
+}
+
+void rm_tmp_dir(const char* tmp_path)
+{
+    if (nftw(tmp_path, remove_callback, FOPEN_MAX, FTW_DEPTH | FTW_MOUNT | FTW_PHYS) ==
+        -1) {
+        perror("tempdir: error: ");
+    }
+}

@@ -62,17 +62,17 @@ static struct qxc_tokenizer* qxc_tokenizer_init(const char* filepath)
     return tokenizer;
 }
 
+static void qxc_tokenizer_free(struct qxc_tokenizer* tokenizer)
+{
+    free(tokenizer->contents);
+    free(tokenizer);
+}
+
 static void qxc_tokenizer_advance(struct qxc_tokenizer* tokenizer)
 {
     tokenizer->next_char_ptr++;
     tokenizer->next_char = *tokenizer->next_char_ptr;
     tokenizer->current_column++;
-}
-
-static void qxc_tokenizer_free(struct qxc_tokenizer* tokenizer)
-{
-    free(tokenizer->contents);
-    free(tokenizer);
 }
 
 // TODO remove?
@@ -178,13 +178,14 @@ static inline bool is_valid_symbol(char c)
     return c != '\0' && strchr("{}();", c) != NULL;
 }
 
-static void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
-                                     struct qxc_token_buffer* token_buffer)
+static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
+                                   struct qxc_token_buffer* token_buffer, char c)
 {
     struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
-    switch (tokenizer->next_char) {
+
+    switch (c) {
         case '{':
             new_token->type = OPEN_BRACE_TOKEN;
             break;
@@ -200,10 +201,19 @@ static void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
         case ';':
             new_token->type = SEMICOLON_TOKEN;
             break;
+        case '=':
+            new_token->type = ASSIGNMENT_TOKEN;
+            break;
         default:
             new_token->type = INVALID_TOKEN;
             break;
     }
+}
+
+static inline void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
+                                            struct qxc_token_buffer* token_buffer)
+{
+    qxc_build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
     qxc_tokenizer_advance(tokenizer);
 }
 
@@ -271,14 +281,25 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
             qxc_tokenizer_advance(tokenizer);
             char c2 = tokenizer->next_char;
 
-            enum qxc_operator op = try_build_digraph_operator(c1, c2);
+            enum qxc_operator digraph_op = try_build_digraph_operator(c1, c2);
 
-            if (op != INVALID_OP) {
-                qxc_consume_operator_token(tokenizer, token_buffer, op);
+            if (digraph_op != INVALID_OP) {
+                qxc_consume_operator_token(tokenizer, token_buffer, digraph_op);
             }
             else {
-                qxc_build_operator_token(tokenizer, token_buffer,
-                                         build_unigraph_operator(c1));
+                enum qxc_operator maybe_unigraph_op = build_unigraph_operator(c1);
+
+                if (maybe_unigraph_op != INVALID_OP) {
+                    qxc_build_operator_token(tokenizer, token_buffer, maybe_unigraph_op);
+                }
+                else if (c1 == '=') {
+                    qxc_build_symbol_token(tokenizer, token_buffer, ASSIGNMENT_TOKEN);
+                }
+                else {
+                    fprintf(stderr, "invalid operator-like character encountered: %c\n",
+                            c1);
+                    goto failure;
+                }
             }
         }
 

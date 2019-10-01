@@ -7,111 +7,162 @@
 
 #include <assert.h>
 #include <libgen.h>
+#include <limits.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define MAX_PATH_LEN ((size_t)1024)
+// TODO: capitalize
+enum qxc_mode { TOKENIZE_MODE, PARSE_MODE, COMPILE_MODE };
 
-enum qxc_mode { qxc_tokenize_mode, qxc_parse_mode, qxc_compile_mode, qxc_unknown_mode };
+struct qxc_context {
+    char canonical_input_filepath[PATH_MAX];
+    char work_dir[PATH_MAX];
+    char output_assembly_path[2 * PATH_MAX];
+    char output_object_path[2 * PATH_MAX];
+    char output_exe_path[2 * PATH_MAX];
 
-int main(int argc, char* argv[])
+    enum qxc_mode mode;
+    bool verbose;
+};
+
+// parse command line arguments, determine paths of output files and working directory
+static int qxc_context_init(struct qxc_context* ctx, int argc, char* argv[])
 {
+    *ctx = (struct qxc_context){'\0'};
+
+    ctx->mode = COMPILE_MODE;
+    ctx->verbose = false;
+
     if (argc < 2) {
-        fprintf(stderr, "Need at least two arguments!\n");
-        return EXIT_FAILURE;
+        // TODO error print macro
+        fprintf(stderr,
+                "Need at least one argument specifying .c file to be compiled.\n");
+        return -1;
     }
 
-    const char* input_filepath = NULL;
-    enum qxc_mode MODE = qxc_compile_mode;
-    bool verbose = false;
+    const char* user_specified_input_filepath = NULL;
 
     for (int i = 1; i < argc; i++) {
         const char* ith_arg = argv[i];
 
         if (access(ith_arg, R_OK) == -1) {
             if (strs_are_equal("-t", ith_arg)) {
-                MODE = qxc_tokenize_mode;
+                ctx->mode = TOKENIZE_MODE;
             }
             else if (strs_are_equal("-p", ith_arg)) {
-                MODE = qxc_parse_mode;
+                ctx->mode = PARSE_MODE;
             }
             else if (strs_are_equal("-v", ith_arg)) {
-                verbose = true;
+                ctx->verbose = true;
             }
         }
         else {
-            input_filepath = ith_arg;
+            user_specified_input_filepath = ith_arg;
         }
     }
 
-    // printf("input filepath: %s\n", input_filepath);
-
-    if (input_filepath == NULL) {
-        fprintf(stderr, "Failed to open file\n");
+    if (user_specified_input_filepath == NULL) {
+        fprintf(stderr, "No input file specified in command line arguments.\n");
         return EXIT_FAILURE;
     }
 
-    const size_t path_len = strlen(input_filepath);
-
-    if (path_len > MAX_PATH_LEN - 1) {
-        fprintf(stderr, "input filepath too long!\n");
+    if (realpath(user_specified_input_filepath, ctx->canonical_input_filepath) == NULL) {
+        fprintf(stderr, "Specified file doesn't exist or could not be opened.\n");
+        fprintf(stderr, "--> %s\n", user_specified_input_filepath);
+        return EXIT_FAILURE;
     }
 
-    char input_dir[MAX_PATH_LEN];
-    char input_base[MAX_PATH_LEN];
+    const size_t canonical_path_len = strlen(ctx->canonical_input_filepath);
 
-    strncpy(input_dir, input_filepath, path_len);
-    strncpy(input_base, input_filepath, path_len);
+    char input_dir[PATH_MAX];
+    char input_base[PATH_MAX];
+    strncpy(input_dir, ctx->canonical_input_filepath, canonical_path_len);
+    strncpy(input_base, ctx->canonical_input_filepath, canonical_path_len);
 
     char* dname = dirname(input_dir);
     char* bname = basename(input_base);
     strip_ext(bname);
 
-    char output_assembly_path[MAX_PATH_LEN];
-    char output_object_path[MAX_PATH_LEN];
-    char output_exe_path[MAX_PATH_LEN];
-    sprintf(output_assembly_path, "%s/%s.asm", dname, bname);
-    sprintf(output_object_path, "%s/%s.o", dname, bname);
-    sprintf(output_exe_path, "%s/%s", dname, bname);
+    const char* new_tmp_dir = mk_tmp_dir();
+    if (new_tmp_dir == NULL) {
+        fprintf(stderr, "failed to create working dir for qxc\n");
+        return -1;
+    }
 
-    if (MODE == qxc_tokenize_mode) {
-        struct qxc_token_buffer* tokens = qxc_tokenize(input_filepath);
+    sprintf(ctx->work_dir, "%s", new_tmp_dir);
+
+    sprintf(ctx->output_assembly_path, "%s/%s.asm", ctx->work_dir, bname);
+    sprintf(ctx->output_object_path, "%s/%s.o", ctx->work_dir, bname);
+    sprintf(ctx->output_exe_path, "%s/%s", dname, bname);
+
+    return 0;
+}
+
+static int qxc_context_deinit(struct qxc_context* ctx)
+{
+    rm_tmp_dir(ctx->work_dir);
+    return 0;
+}
+
+static int qxc_context_run(const struct qxc_context* ctx)
+{
+    if (ctx->mode == TOKENIZE_MODE) {
+        struct qxc_token_buffer* tokens = qxc_tokenize(ctx->canonical_input_filepath);
         if (tokens == NULL) {
             fprintf(stderr, "lexure failure\n");
-            return EXIT_FAILURE;
+            return -1;
         }
         printf("=== TOKENS ===\n");
         for (size_t i = 0; i < tokens->length; i++) {
             qxc_token_print(&tokens->tokens[i]);
         }
-        return EXIT_SUCCESS;
+        return 0;
     }
 
-    struct qxc_program* program = qxc_parse(input_filepath);
+    struct qxc_program* program = qxc_parse(ctx->canonical_input_filepath);
     if (program == NULL) {
-        return EXIT_FAILURE;
+        return -1;
     }
 
-    if (verbose) {
+    if (ctx->verbose) {
         print_program(program);
     }
 
-    generate_asm(program, output_assembly_path);
+    generate_asm(program, ctx->output_assembly_path);
 
-    char nasm_cmd[MAX_PATH_LEN * 3];
-    sprintf(nasm_cmd, "nasm -felf64 %s -o %s", output_assembly_path, output_object_path);
+    char nasm_cmd[PATH_MAX * 5];
+    sprintf(nasm_cmd, "nasm -felf64 %s -o %s", ctx->output_assembly_path,
+            ctx->output_object_path);
     if (system(nasm_cmd) != 0) {
         fprintf(stderr, "NASM ASSEMBLER FAILED\n");
-        return EXIT_FAILURE;
+        return -1;
     }
 
-    char ld_cmd[MAX_PATH_LEN * 3];
-    sprintf(ld_cmd, "ld %s -o %s", output_object_path, output_exe_path);
+    char ld_cmd[PATH_MAX * 5];
+    sprintf(ld_cmd, "ld %s -o %s", ctx->output_object_path, ctx->output_exe_path);
 
     if (system(ld_cmd) != 0) {
         fprintf(stderr, "LD LINKER FAILED\n");
-        return EXIT_FAILURE;
+        return -1;
     }
+
+    return 0;
+}
+
+int main(int argc, char* argv[])
+{
+    struct qxc_context ctx;
+
+    const int init_code = qxc_context_init(&ctx, argc, argv);
+    if (init_code != 0) return init_code;
+
+    const int run_code = qxc_context_run(&ctx);
+    if (run_code != 0) return run_code;
+
+    const int deinit_code = qxc_context_deinit(&ctx);
+
+    return deinit_code;
 }

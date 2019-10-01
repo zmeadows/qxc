@@ -129,6 +129,9 @@ void qxc_token_print(struct qxc_token* token)
         case SEMICOLON_TOKEN:
             printf(";");
             break;
+        case ASSIGNMENT_TOKEN:
+            printf("=");
+            break;
         case KEYWORD_TOKEN:
             printf("keyword: %s", qxc_keyword_to_str(token->keyword));
             break;
@@ -165,7 +168,7 @@ struct qxc_token* qxc_token_buffer_extend(struct qxc_token_buffer* buffer)
     if (buffer->capacity == buffer->length) {
         size_t new_capacity =
             max(32, (size_t)ceil(1.61803398875 * (double)buffer->capacity));
-        buffer->tokens = realloc(buffer->tokens, new_capacity);
+        buffer->tokens = realloc(buffer->tokens, sizeof(struct qxc_token) * new_capacity);
         buffer->capacity = new_capacity;
     }
 

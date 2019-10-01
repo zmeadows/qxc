@@ -45,6 +45,7 @@ enum qxc_token_type {
     OPEN_PAREN_TOKEN,
     OPERATOR_TOKEN,
     SEMICOLON_TOKEN,
+    ASSIGNMENT_TOKEN,
     INVALID_TOKEN
 };
 

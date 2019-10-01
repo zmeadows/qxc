@@ -25,6 +25,7 @@ MYCFLAGS = -Wall \
 		   -fno-omit-frame-pointer \
 		   -fstrict-aliasing \
 		   -pedantic \
+		   -D_DEFAULT_SOURCE \
 		   -g \
 		   -Og \
 		   -std=c11 \

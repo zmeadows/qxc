@@ -43,7 +43,7 @@ static void print_statement(struct qxc_ast_statement_node* statement)
         case RETURN_STATEMENT:
             PPRINT("Return:\n");
             indent_level++;
-            print_expression(statement->expr);
+            print_expression(statement->return_expr);
             indent_level--;
             break;
 

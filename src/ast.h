@@ -33,13 +33,23 @@ struct qxc_ast_expression_node {
 
 // --------------------------------------------------------------------------------
 
-enum qxc_statement_type { RETURN_STATEMENT, INVALID_STATEMENT };
+enum qxc_statement_type {
+    RETURN_STATEMENT,
+    DECLARATION_STATEMENT,
+    EXPRESSION_STATEMENT,
+    INVALID_STATEMENT
+};
 
 struct qxc_ast_statement_node {
     enum qxc_statement_type type;
 
     union {
-        struct qxc_ast_expression_node* expr;
+        struct qxc_ast_expression_node* return_expr;
+        struct {
+            const char* var_name;
+            struct qxc_ast_expression_node* initializer_expr;
+        };
+        struct qxc_ast_expression_node* standalone_expr;
     };
 };
 

@@ -195,7 +195,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
 {
     switch (node->type) {
         case RETURN_STATEMENT:
-            generate_expression_asm(gen, node->expr);
+            generate_expression_asm(gen, node->return_expr);
             emit(gen, "mov rdi, rax");
             emit(gen, "mov rax, 60");  // syscall for exit
             emit(gen, "syscall");

@@ -221,9 +221,9 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
         qxc_malloc(sizeof(struct qxc_ast_statement_node));
 
     statement->type = RETURN_STATEMENT;
-    statement->expr = qxc_parse_expression(parser, 0);
+    statement->return_expr = qxc_parse_expression(parser, 0);
 
-    EXPECT(statement->expr, "Expression parsing failed");
+    EXPECT(statement->return_expr, "Expression parsing failed");
 
     EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
            "Missing semicolon at end of statement");

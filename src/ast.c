@@ -249,7 +249,7 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
     decl->name = func_name;
 
     // node->statement = qxc_parse_statement(parser);
-    while (!(peek_next_token(parser)->type == CLOSE_BRACE_TOKEN)) {
+    while (peek_next_token(parser)->type != CLOSE_BRACE_TOKEN) {
         qxc_statement_list_append(decl->slist, qxc_parse_statement(parser));
     }
 

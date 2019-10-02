@@ -1,5 +1,6 @@
 #pragma once
 
+#include "darray.h"
 #include "prelude.h"
 #include "token.h"
 
@@ -33,7 +34,7 @@ struct qxc_ast_expression_node {
 
 // --------------------------------------------------------------------------------
 
-enum qxc_statement_type { RETURN_STATEMENT };
+enum qxc_statement_type { RETURN_STATEMENT, INVALID_STATEMENT };
 
 struct qxc_ast_statement_node {
     enum qxc_statement_type type;
@@ -43,11 +44,16 @@ struct qxc_ast_statement_node {
     };
 };
 
+struct qxc_statement_list {
+    struct qxc_ast_statement_node* node;
+    struct qxc_statement_list* next_node;
+};
+
 // --------------------------------------------------------------------------------
 
 struct qxc_ast_function_decl_node {
     const char* name;
-    struct qxc_ast_statement_node* statement;
+    struct qxc_statement_list* slist;
 };
 
 // --------------------------------------------------------------------------------

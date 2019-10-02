@@ -61,7 +61,12 @@ static void print_function_decl(struct qxc_ast_function_decl_node* node)
     PPRINT("PARAMS: ()\n");
     PPRINT("BODY:\n");
     indent_level++;
-    print_statement(node->statement);
+
+    struct qxc_statement_list* s = node->slist;
+    while (s->next_node != NULL) {
+        print_statement(s->node);
+        s = s->next_node;
+    }
     indent_level -= 2;
 }
 

@@ -31,7 +31,11 @@ struct qxc_context {
 // parse command line arguments, determine paths of output files and working directory
 static int qxc_context_init(struct qxc_context* ctx, int argc, char* argv[])
 {
-    *ctx = (struct qxc_context){'\0'};
+    ctx->canonical_input_filepath[0] = '\0';
+    ctx->work_dir[0] = '\0';
+    ctx->output_assembly_path[0] = '\0';
+    ctx->output_object_path[0] = '\0';
+    ctx->output_exe_path[0] = '\0';
 
     ctx->mode = COMPILE_MODE;
     ctx->verbose = false;

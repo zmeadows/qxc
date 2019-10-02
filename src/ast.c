@@ -31,6 +31,17 @@ struct qxc_parser {
         }                \
     } while (0)
 
+static void qxc_statement_list_append(struct qxc_statement_list* slist,
+                                      struct qxc_ast_statement_node* new_statement_node)
+{
+    while (slist->node) {
+        slist = slist->next_node;
+    }
+
+    slist->node = new_statement_node;
+    slist->next_node = qxc_malloc(sizeof(struct qxc_statement_list));
+}
+
 static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 {
     if (parser->itoken < parser->token_buffer->length) {
@@ -230,19 +241,25 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
     EXPECT(qxc_parser_expect_token_type(parser, OPEN_BRACE_TOKEN),
            "Missing open brace token");
 
-    struct qxc_ast_function_decl_node* node =
+    struct qxc_ast_function_decl_node* decl =
         qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
+    decl->slist = qxc_malloc(sizeof(struct qxc_statement_list));
+    decl->slist->node = NULL;
+    decl->slist->next_node = NULL;
+    decl->name = func_name;
 
-    node->name = func_name;
+    // node->statement = qxc_parse_statement(parser);
+    while (!(peek_next_token(parser)->type == CLOSE_BRACE_TOKEN)) {
+        qxc_statement_list_append(decl->slist, qxc_parse_statement(parser));
+    }
 
-    node->statement = qxc_parse_statement(parser);
-
-    EXPECT(node->statement, "failed to parse function body");
+    // TODO : check for errors on each statement parse
+    EXPECT(decl->slist->node, "failed to parse function body");
 
     EXPECT(qxc_parser_expect_token_type(parser, CLOSE_BRACE_TOKEN),
            "Missing close brace token");
 
-    return node;
+    return decl;
 }
 
 struct qxc_program* qxc_parse(const char* filepath)

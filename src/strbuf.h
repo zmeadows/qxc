@@ -29,7 +29,7 @@ void qxc_strbuf_free(struct qxc_strbuf* str) {
 
 void qxc_strbuf_reserve(struct qxc_strbuf* str, size_t bytes) {
     if (bytes <= str->capacity) return;
-    debug_print("reserving %lu bytes for strbuf\n", bytes);
+    debug_print("reserving %zu bytes for strbuf\n", bytes);
     str->contents = realloc(str->contents, bytes);
     str->capacity = bytes;
 }
@@ -45,7 +45,7 @@ static void qxc_strbuf_maybe_extend(struct qxc_strbuf* str) {
         size_t new_capacity =
             (size_t)ceil(1.61803398875 * (double)str->capacity);
         if (new_capacity < 4) new_capacity = 4;
-        debug_print("extending strbuf from old capacity (%lu) to (%lu)\n",
+        debug_print("extending strbuf from old capacity (%zu) to (%zu)\n",
                     str->capacity, new_capacity);
         str->contents = realloc(str->contents, new_capacity);
         printf("finished realloc\n");

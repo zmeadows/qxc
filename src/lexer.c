@@ -38,6 +38,7 @@ static struct qxc_tokenizer* qxc_tokenizer_init(const char* filepath)
     long fsizel = ftell(f);
 
     if (fsizel < 0) {
+        fclose(f);
         return NULL;
     }
 

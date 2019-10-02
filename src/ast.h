@@ -54,10 +54,12 @@ struct qxc_ast_statement_node {
 
     union {
         struct qxc_ast_expression_node* return_expr;
+
         struct {
             const char* var_name;
             struct qxc_ast_expression_node* initializer_expr;
         };
+
         struct qxc_ast_expression_node* standalone_expr;
     };
 };

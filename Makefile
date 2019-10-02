@@ -32,6 +32,8 @@ MYCFLAGS = -Wall \
 
 MYLIBS   = -lm
 
+CPPCHECK = cppcheck
+
 # Files and folders
 SRCS    = $(shell find $(SRCDIR) -type f -name '*.c')
 HEADERS = $(shell find $(SRCDIR) -type f -name "*.h")
@@ -41,6 +43,7 @@ OBJS    = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
 # Targets
 $(PROJECT): buildrepo $(OBJS)
 	$(CC) -o $@ $(OBJS) $(MYCFLAGS) $(MYLIBS)
+	@$(call call-cppcheck)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -o $@ $< -c $(MYCFLAGS)
@@ -61,3 +64,6 @@ define make-repo
 	done
 endef
 
+define call-cppcheck
+	cppcheck --suppress=missingIncludeSystem --enable=warning,style,performance,portability,information,missingInclude --std=c11 -q --inconclusive --std=posix  -I $(SRCDIR) $(SRCDIR)/*.c $(SRCDIR)/*.h
+endef

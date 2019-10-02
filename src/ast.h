@@ -9,6 +9,8 @@ enum qxc_expression_type {
     INT_LITERAL_EXPR,
     UNARY_OP_EXPR,
     BINARY_OP_EXPR,
+    ASSIGNMENT_EXPR,
+    VARIABLE_REFERENCE_EXPR,
     INVALID_EXPR
 };
 
@@ -16,6 +18,13 @@ struct qxc_ast_expression_node {
     enum qxc_expression_type type;
 
     union {
+        long literal;
+
+        struct {
+            enum qxc_operator unop;
+            struct qxc_ast_expression_node* unary_expr;
+        };
+
         struct {
             enum qxc_operator binop;
             struct qxc_ast_expression_node* left_expr;
@@ -23,11 +32,11 @@ struct qxc_ast_expression_node {
         };
 
         struct {
-            enum qxc_operator unop;
-            struct qxc_ast_expression_node* unary_expr;
+            const char* assignee_var_name;
+            struct qxc_ast_expression_node* assignment_expr;
         };
 
-        long literal;
+        const char* referenced_var_name;
     };
 };
 

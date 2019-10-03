@@ -38,7 +38,7 @@ void print_expression(struct qxc_ast_expression_node* node)
             indent_level--;
             break;
         case VARIABLE_REFERENCE_EXPR:
-            PPRINT("VariableRef<%s>:\n", node->referenced_var_name);
+            PPRINT("VariableRef<%s>\n", node->referenced_var_name);
             break;
         case INVALID_EXPR:
             PPRINT("InvalidExpr");
@@ -60,12 +60,15 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             break;
 
         case DECLARATION_STATEMENT:
-            PPRINT("Declaration<%s>:\n", statement->var_name);
-            indent_level++;
             if (statement->initializer_expr) {
+                PPRINT("Declaration<%s>:\n", statement->var_name);
+                indent_level++;
                 print_expression(statement->initializer_expr);
+                indent_level--;
             }
-            indent_level--;
+            else {
+                PPRINT("Declaration<%s>\n", statement->var_name);
+            }
             break;
 
         case EXPRESSION_STATEMENT:

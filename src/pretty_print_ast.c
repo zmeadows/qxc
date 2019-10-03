@@ -31,6 +31,18 @@ void print_expression(struct qxc_ast_expression_node* node)
             print_expression(node->right_expr);
             indent_level--;
             break;
+        case ASSIGNMENT_EXPR:
+            PPRINT("Assignment<%s>:\n", node->assignee_var_name);
+            indent_level++;
+            print_expression(node->assignment_expr);
+            indent_level--;
+            break;
+        case VARIABLE_REFERENCE_EXPR:
+            PPRINT("VariableRef<%s>:\n", node->referenced_var_name);
+            break;
+        case INVALID_EXPR:
+            PPRINT("InvalidExpr");
+            break;
         default:
             printf("\nunrecognized expression type\n");
             return;
@@ -47,8 +59,24 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             indent_level--;
             break;
 
+        case DECLARATION_STATEMENT:
+            PPRINT("Declaration<%s>:\n", statement->var_name);
+            indent_level++;
+            if (statement->initializer_expr) {
+                print_expression(statement->initializer_expr);
+            }
+            indent_level--;
+            break;
+
+        case EXPRESSION_STATEMENT:
+            PPRINT("StandaloneExpr:\n");
+            indent_level++;
+            print_expression(statement->standalone_expr);
+            indent_level--;
+            break;
+
         default:
-            printf("\nunrecognized statement type\n");
+            printf("\nunrecognized statement type! update pretty_print_ast.c!\n");
             return;
     }
 }
@@ -63,7 +91,7 @@ static void print_function_decl(struct qxc_ast_function_decl_node* node)
     indent_level++;
 
     struct qxc_statement_list* s = node->slist;
-    while (s->next_node != NULL) {
+    while (s->node != NULL) {
         print_statement(s->node);
         s = s->next_node;
     }

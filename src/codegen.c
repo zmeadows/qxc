@@ -202,7 +202,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             break;
 
         default:
-            printf("\nunrecognized statement type\n");
+            // printf("\nunrecognized statement type\n");
             break;
     }
     return;

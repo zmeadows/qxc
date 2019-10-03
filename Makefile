@@ -65,5 +65,5 @@ define make-repo
 endef
 
 define call-cppcheck
-	cppcheck --suppress=missingIncludeSystem --enable=warning,style,performance,portability,information,missingInclude --std=c11 -q --inconclusive --std=posix  -I $(SRCDIR) $(SRCDIR)/*.c $(SRCDIR)/*.h
+	cppcheck --suppress=missingIncludeSystem --enable=warning,performance,portability,information,missingInclude --std=c11 -q --inconclusive --std=posix  -I $(SRCDIR) $(SRCDIR)/*.c $(SRCDIR)/*.h
 endef

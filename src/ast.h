@@ -32,7 +32,7 @@ struct qxc_ast_expression_node {
         };
 
         struct {
-            const char* assignee_var_name;
+            char* assignee_var_name;
             struct qxc_ast_expression_node* assignment_expr;
         };
 
@@ -56,7 +56,7 @@ struct qxc_ast_statement_node {
         struct qxc_ast_expression_node* return_expr;
 
         struct {
-            const char* var_name;
+            char* var_name;
             struct qxc_ast_expression_node* initializer_expr;
         };
 

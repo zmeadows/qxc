@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #define debug_print(...)                                               \
@@ -14,8 +14,8 @@
         fprintf(stderr, "\n");                                         \
     } while (0)
 #else
-#define debug_print(x) \
-    do {               \
+#define debug_print(...) \
+    do {                 \
     } while (0)
 #endif
 

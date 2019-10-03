@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 // <program> ::= <function>
 // <function> ::= "int" <id> "(" ")" "{" { <statement> } "}"
@@ -57,6 +58,14 @@ static void qxc_statement_list_append(struct qxc_statement_list* slist,
     slist->next_node = qxc_malloc(sizeof(struct qxc_statement_list));
     slist->next_node->node = NULL;
     slist->next_node->next_node = NULL;
+}
+
+static void rewind_token_buffer(struct qxc_parser* parser, size_t count)
+{
+    while (count > 0 && parser->itoken > 0) {
+        parser->itoken--;
+        count--;
+    }
 }
 
 static struct qxc_token* pop_next_token(struct qxc_parser* parser)
@@ -111,6 +120,7 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
     return next_token;
 }
 
+// FIXME: Use _Generic to make a generic AST node allocation method?
 static inline struct qxc_ast_expression_node* new_expr_node(void)
 {
     struct qxc_ast_expression_node* expr =
@@ -128,9 +138,10 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
     struct qxc_token* next_token = pop_next_token(parser);
     switch (next_token->type) {
         case INTEGER_LITERAL_TOKEN:
+            debug_print("parsed integer literal factor: %ld",
+                        next_token->int_literal_value);
             factor->type = INT_LITERAL_EXPR;
             factor->literal = next_token->int_literal_value;
-
             break;
 
         case OPERATOR_TOKEN:
@@ -145,13 +156,21 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
             break;
 
         case OPEN_PAREN_TOKEN:
+            debug_print("attempting to parse paren closed expression...");
             factor = qxc_parse_expression(parser, -1);
 
-            EXPECT_(factor);
+            EXPECT(factor, "failed to parse paren-closed expression");
 
             EXPECT(qxc_parser_expect_token_type(parser, CLOSE_PAREN_TOKEN),
                    "Missing close parenthesis after enclosed factor");
 
+            debug_print("found close paren for enclosed expression");
+
+            break;
+
+        case IDENTIFIER_TOKEN:
+            factor->type = VARIABLE_REFERENCE_EXPR;
+            factor->referenced_var_name = next_token->name;
             break;
 
         default:
@@ -196,10 +215,38 @@ static int binop_precedence(enum qxc_operator op)
 static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser,
                                                             int min_precedence)
 {
+    struct qxc_token* next_token = peek_next_token(parser);
+
+    if (next_token->type == IDENTIFIER_TOKEN) {
+        // either a variable reference or variable assignment
+        struct qxc_token* id_token = pop_next_token(parser);
+        next_token = peek_next_token(parser);
+
+        if (next_token->type == ASSIGNMENT_TOKEN) {
+            (void)pop_next_token(parser);
+            debug_print("parsing assignment of var: %s", id_token->name);
+
+            struct qxc_ast_expression_node* assignment_expr = new_expr_node();
+            assignment_expr->type = ASSIGNMENT_EXPR;
+            assignment_expr->assignee_var_name = id_token->name;
+            assignment_expr->assignment_expr = qxc_parse_expression(parser, -1);
+
+            EXPECT(assignment_expr,
+                   "failed to parse assignment expression for variable: %s",
+                   id_token->name);
+            debug_print("successfully parsed assignment expression of variable: %s",
+                        id_token->name);
+            return assignment_expr;
+        }
+        else {
+            rewind_token_buffer(parser, 1);
+        }
+    }
+
     struct qxc_ast_expression_node* left_expr = qxc_parse_factor(parser);
     EXPECT_(left_expr);
 
-    struct qxc_token* next_token = peek_next_token(parser);
+    next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
     while (next_token->type == OPERATOR_TOKEN) {
@@ -231,11 +278,12 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
 
 static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
 {
-    const struct qxc_token* next_token = peek_next_token(parser);
-
     struct qxc_ast_statement_node* statement =
         qxc_malloc(sizeof(struct qxc_ast_statement_node));
     statement->type = INVALID_STATEMENT;
+
+    struct qxc_token* next_token = peek_next_token(parser);
+    EXPECT(next_token, "Expected a statement here!");
 
     if (next_token->type == KEYWORD_TOKEN && next_token->keyword == RETURN_KEYWORD) {
         // return statement
@@ -248,20 +296,41 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
         EXPECT(statement->return_expr, "Expression parsing failed");
     }
     else if (next_token->type == KEYWORD_TOKEN && next_token->keyword == INT_KEYWORD) {
-        // variable declaration statement
+        statement->type = DECLARATION_STATEMENT;
+        pop_next_token(parser);               // pop off int keyword
+        next_token = pop_next_token(parser);  // pop off identifier
+        EXPECT(next_token->type == IDENTIFIER_TOKEN,
+               "Invalid identifier found for variable declaration name");
+
+        debug_print("parsing declaration of int var: %s", next_token->name);
+
+        const size_t id_len = strlen(next_token->name) + 1;  // includes \0 terminator
+        statement->var_name = qxc_malloc(id_len);
+        memcpy(statement->var_name, next_token->name, id_len);
+
+        // FIXME: remember to check that next_token isn't null in all these if
+        // (next_token->type == blah) type branches
+        next_token = peek_next_token(parser);
+        if (next_token && next_token->type == ASSIGNMENT_TOKEN) {
+            pop_next_token(parser);  // pop off '='
+            statement->initializer_expr = qxc_parse_expression(parser, 0);
+            EXPECT(statement->initializer_expr, "Failed to parse variable initializer");
+        }
     }
     else {
         // fallthrough, so attempt to parse standalone expression statement
         // for now the only meaningful stand-alone expression is variable assignment
         // i.e. a = 2;
+        debug_print("attemting to parse standalone expression");
         struct qxc_ast_expression_node* standalone_expression =
-            qxc_parse_expression(parser, 0);
+            qxc_parse_expression(parser, -1);
 
         EXPECT(standalone_expression, "Failed to parse standalone expression");
 
         statement->type = EXPRESSION_STATEMENT;
         statement->standalone_expr = standalone_expression;
     }
+
     EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
            "Missing semicolon at end of statement");
 
@@ -291,6 +360,7 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
         struct qxc_ast_statement_node* next_statement = qxc_parse_statement(parser);
         EXPECT(next_statement, "Failed to parse statement in function: %s", func_name);
         qxc_statement_list_append(decl->slist, next_statement);
+        debug_print("successfully parsed statement");
         if (next_statement->type == RETURN_STATEMENT) {
             found_return_statement = true;
         }

@@ -105,11 +105,7 @@ static int qxc_context_init(struct qxc_context* ctx, int argc, char* argv[])
     return 0;
 }
 
-static void qxc_context_deinit(struct qxc_context* ctx)
-{
-    rm_tmp_dir(ctx->work_dir);
-    return 0;
-}
+static void qxc_context_deinit(struct qxc_context* ctx) { rm_tmp_dir(ctx->work_dir); }
 
 static int qxc_context_run(const struct qxc_context* ctx)
 {
@@ -173,5 +169,5 @@ int main(int argc, char* argv[])
     }
 
     qxc_context_deinit(&ctx);
-    return deinit_code;
+    return EXIT_SUCCESS;
 }

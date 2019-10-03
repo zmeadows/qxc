@@ -28,7 +28,40 @@ struct qxc_parser {
     size_t itoken;
 };
 
-// TODO: remove qxc_ prefix from static functions
+static struct qxc_ast_expression_node* alloc_empty_expression(void)
+{
+    struct qxc_ast_expression_node* expr =
+        qxc_calloc(sizeof(struct qxc_ast_expression_node));
+    expr->type = INVALID_EXPR;
+    return expr;
+}
+
+static struct qxc_ast_statement_node* alloc_empty_statement(void)
+{
+    struct qxc_ast_statement_node* statement =
+        qxc_calloc(sizeof(struct qxc_ast_statement_node));
+    statement->type = INVALID_STATEMENT;
+    return statement;
+}
+
+static struct qxc_statement_list* alloc_statement_list(void)
+{
+    struct qxc_statement_list* slist = qxc_malloc(sizeof(struct qxc_statement_list));
+    slist->node = NULL;
+    slist->next_node = NULL;
+    return slist;
+}
+
+static struct qxc_ast_function_decl_node* alloc_empty_function_decl(void)
+{
+    struct qxc_ast_function_decl_node* decl =
+        qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
+
+    decl->slist = alloc_statement_list();
+    decl->name = NULL;
+
+    return decl;
+}
 
 #define EXPECT(EXPR, ...)                                                  \
     do {                                                                   \
@@ -48,16 +81,14 @@ struct qxc_parser {
     } while (0)
 
 static void qxc_statement_list_append(struct qxc_statement_list* slist,
-                                      struct qxc_ast_statement_node* new_statement_node)
+                                      struct qxc_ast_statement_node* statement_to_append)
 {
     while (slist->node) {
         slist = slist->next_node;
     }
 
-    slist->node = new_statement_node;
-    slist->next_node = qxc_malloc(sizeof(struct qxc_statement_list));
-    slist->next_node->node = NULL;
-    slist->next_node->next_node = NULL;
+    slist->node = statement_to_append;
+    slist->next_node = alloc_statement_list();
 }
 
 static void rewind_token_buffer(struct qxc_parser* parser, size_t count)
@@ -120,20 +151,11 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
     return next_token;
 }
 
-// FIXME: Use _Generic to make a generic AST node allocation method?
-static inline struct qxc_ast_expression_node* new_expr_node(void)
-{
-    struct qxc_ast_expression_node* expr =
-        qxc_malloc(sizeof(struct qxc_ast_expression_node));
-    expr->type = INVALID_EXPR;
-    return expr;
-}
-
 static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser*, int);
 
 static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parser)
 {
-    struct qxc_ast_expression_node* factor = new_expr_node();
+    struct qxc_ast_expression_node* factor = alloc_empty_expression();
 
     struct qxc_token* next_token = pop_next_token(parser);
     switch (next_token->type) {
@@ -226,7 +248,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
             (void)pop_next_token(parser);
             debug_print("parsing assignment of var: %s", id_token->name);
 
-            struct qxc_ast_expression_node* assignment_expr = new_expr_node();
+            struct qxc_ast_expression_node* assignment_expr = alloc_empty_expression();
             assignment_expr->type = ASSIGNMENT_EXPR;
             assignment_expr->assignee_var_name = id_token->name;
             assignment_expr->assignment_expr = qxc_parse_expression(parser, -1);
@@ -261,7 +283,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
             qxc_parse_expression(parser, next_op_precedence);  // descend
         EXPECT_(right_expr);
 
-        struct qxc_ast_expression_node* binop_expr = new_expr_node();
+        struct qxc_ast_expression_node* binop_expr = alloc_empty_expression();
         binop_expr->type = BINARY_OP_EXPR;
         binop_expr->binop = next_token->op;
         binop_expr->left_expr = left_expr;
@@ -278,9 +300,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
 
 static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
 {
-    struct qxc_ast_statement_node* statement =
-        qxc_malloc(sizeof(struct qxc_ast_statement_node));
-    statement->type = INVALID_STATEMENT;
+    struct qxc_ast_statement_node* statement = alloc_empty_statement();
 
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT(next_token, "Expected a statement here!");
@@ -348,11 +368,7 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
     EXPECT(qxc_parser_expect_token_type(parser, OPEN_BRACE_TOKEN),
            "Missing open brace token");
 
-    struct qxc_ast_function_decl_node* decl =
-        qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
-    decl->slist = qxc_malloc(sizeof(struct qxc_statement_list));
-    decl->slist->node = NULL;
-    decl->slist->next_node = NULL;
+    struct qxc_ast_function_decl_node* decl = alloc_empty_function_decl();
     decl->name = func_name;
 
     bool found_return_statement = false;
@@ -381,26 +397,27 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
 
 struct qxc_program* qxc_parse(const char* filepath)
 {
-    struct qxc_parser* parser = qxc_malloc(sizeof(struct qxc_parser));
-    parser->token_buffer = qxc_tokenize(filepath);
-    if (!parser->token_buffer) {
+    struct qxc_parser parser;
+
+    parser.token_buffer = qxc_tokenize(filepath);
+    if (!parser.token_buffer) {
         return NULL;
     }
-    parser->itoken = 0;
+    parser.itoken = 0;
 
-    EXPECT(qxc_parser_expect_keyword(parser, INT_KEYWORD),
+    EXPECT(qxc_parser_expect_keyword(&parser, INT_KEYWORD),
            "Invalid main type signature, must return int.");
 
-    EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");
+    EXPECT(qxc_parser_expect_identifier(&parser, "main"), "Invalid main function name");
 
     struct qxc_ast_function_decl_node* main_decl =
-        qxc_parse_function_decl(parser, "main");
+        qxc_parse_function_decl(&parser, "main");
 
     EXPECT(main_decl, "Failed to parse main function declaration");
 
     struct qxc_program* program = qxc_malloc(sizeof(struct qxc_program));
     program->main_decl = main_decl;
 
-    qxc_token_buffer_free(parser->token_buffer);
+    qxc_token_buffer_free(parser.token_buffer);
     return program;
 }

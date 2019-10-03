@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // FIXME: what if user requests more than QXC_MEMORY_POOL_SIZE_BYTES with qxc_malloc?
 #define QXC_MEMORY_POOL_SIZE_BYTES ((size_t)(500e3))
@@ -68,5 +69,12 @@ void* qxc_malloc(size_t bytes)
 
         pool = pool->next_pool;
     }
+}
+
+void* qxc_calloc(size_t bytes)
+{
+    void* mem = qxc_malloc(bytes);
+    memset(mem, 0, bytes);
+    return mem;
 }
 

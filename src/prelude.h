@@ -3,6 +3,7 @@
 #define _XOPEN_SOURCE 500L
 
 #include <stdbool.h>
+#include <stdlib.h>
 
 // #define DEBUG
 
@@ -25,3 +26,5 @@ void strip_ext(char* fname);
 
 const char* mk_tmp_dir(void);
 void rm_tmp_dir(const char* tmp_path);
+
+size_t max(size_t a, size_t b);

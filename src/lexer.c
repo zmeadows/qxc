@@ -180,9 +180,9 @@ static inline bool is_valid_symbol(char c)
 }
 
 static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
-                                   struct qxc_token_buffer* token_buffer, char c)
+                                   struct qxc_token_array* token_buffer, char c)
 {
-    struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
+    struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
 
@@ -212,17 +212,17 @@ static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
 }
 
 static inline void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
-                                            struct qxc_token_buffer* token_buffer)
+                                            struct qxc_token_array* token_buffer)
 {
     qxc_build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
     qxc_tokenizer_advance(tokenizer);
 }
 
 static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
-                                     struct qxc_token_buffer* token_buffer,
+                                     struct qxc_token_array* token_buffer,
                                      enum qxc_operator op)
 {
-    struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
+    struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
     new_token->type = OPERATOR_TOKEN;
     new_token->op = op;
     new_token->line = tokenizer->current_line;
@@ -231,14 +231,14 @@ static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
 
 // 'consume' == build + advance tokenizer
 static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
-                                       struct qxc_token_buffer* token_buffer,
+                                       struct qxc_token_array* token_buffer,
                                        enum qxc_operator op)
 {
     qxc_build_operator_token(tokenizer, token_buffer, op);
     qxc_tokenizer_advance(tokenizer);
 }
 
-struct qxc_token_buffer* qxc_tokenize(const char* filepath)
+struct qxc_token_array* qxc_tokenize(const char* filepath)
 {
     struct qxc_tokenizer* tokenizer = qxc_tokenizer_init(filepath);
 
@@ -246,13 +246,14 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
         return NULL;
     }
 
-    struct qxc_token_buffer* token_buffer = qxc_token_buffer_alloc();
+    struct qxc_token_array* token_buffer = malloc(sizeof(struct qxc_token_array));
+    qxc_token_array_init(token_buffer, 256);
 
     while (1) {
         if (is_valid_keyword_identifier_first_character(tokenizer->next_char)) {
             qxc_tokenizer_consume_id(tokenizer);
 
-            struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
+            struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
 
             enum qxc_keyword keyword = qxc_str_to_keyword(tokenizer->id);
 
@@ -325,7 +326,7 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
                 goto failure;
             }
 
-            struct qxc_token* new_token = qxc_token_buffer_extend(token_buffer);
+            struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
             new_token->type = INTEGER_LITERAL_TOKEN;
             new_token->line = tokenizer->current_line;
             new_token->column = tokenizer->current_column - tokenizer->id_len;
@@ -350,7 +351,7 @@ struct qxc_token_buffer* qxc_tokenize(const char* filepath)
 
 failure:
     qxc_tokenizer_free(tokenizer);
-    qxc_token_buffer_free(token_buffer);
+    qxc_token_array_free(token_buffer);
     return NULL;
 }
 

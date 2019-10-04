@@ -53,3 +53,5 @@ void rm_tmp_dir(const char* tmp_path)
         perror("tempdir: error: ");
     }
 }
+
+size_t max(size_t a, size_t b) { return a > b ? a : b; }

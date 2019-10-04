@@ -45,7 +45,7 @@ $(PROJECT): buildrepo $(OBJS)
 	$(CC) -o $@ $(OBJS) $(MYCFLAGS) $(MYLIBS)
 	@$(call call-cppcheck)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c
+$(OBJDIR)/%.o: $(SRCDIR)/%.c $(SRCDIR)/darray.h
 	$(CC) -o $@ $< -c $(MYCFLAGS)
 
 clean:

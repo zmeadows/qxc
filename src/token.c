@@ -4,9 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "darray.h"
 #include "prelude.h"
-
-static inline size_t max(size_t a, size_t b) { return a > b ? a : b; }
 
 const char* qxc_keyword_to_str(enum qxc_keyword keyword)
 {
@@ -152,36 +151,38 @@ void qxc_token_print(struct qxc_token* token)
     printf("\n");
 }
 
-struct qxc_token_buffer* qxc_token_buffer_alloc(void)
-{
-    struct qxc_token_buffer* token_buffer = malloc(sizeof(struct qxc_token_buffer));
-    token_buffer->tokens = NULL;
-    token_buffer->capacity = 0;
-    token_buffer->length = 0;
-    return token_buffer;
-}
+IMPLEMENT_DYNAMIC_ARRAY_NEWTYPE(qxc_token_array, struct qxc_token)
 
-void qxc_token_buffer_free(struct qxc_token_buffer* buffer) { free(buffer->tokens); }
-
-struct qxc_token* qxc_token_buffer_extend(struct qxc_token_buffer* buffer)
-{
-    if (buffer->capacity == buffer->length) {
-        size_t new_capacity =
-            max(32, (size_t)ceil(1.61803398875 * (double)buffer->capacity));
-        buffer->tokens = realloc(buffer->tokens, sizeof(struct qxc_token) * new_capacity);
-        buffer->capacity = new_capacity;
-    }
-
-    struct qxc_token* new_token = &buffer->tokens[buffer->length];
-    new_token->type = INVALID_TOKEN;
-    new_token->line = -1;
-    new_token->column = -1;
-    new_token->name[0] = '\0';
-    new_token->int_literal_value = 0;
-    new_token->keyword = INVALID_KEYWORD;
-    new_token->op = INVALID_OP;
-
-    buffer->length++;
-    return new_token;
-}
-
+// struct qxc_token_array* qxc_token_array_alloc(void)
+// {
+//     struct qxc_token_array* token_buffer = malloc(sizeof(struct qxc_token_array));
+//     token_buffer->tokens = NULL;
+//     token_buffer->capacity = 0;
+//     token_buffer->length = 0;
+//     return token_buffer;
+// }
+//
+// void qxc_token_array_free(struct qxc_token_array* buffer) { free(buffer->tokens); }
+//
+// struct qxc_token* qxc_token_array_extend(struct qxc_token_array* buffer)
+// {
+//     if (buffer->capacity == buffer->length) {
+//         size_t new_capacity =
+//             max(32, (size_t)ceil(1.61803398875 * (double)buffer->capacity));
+//         buffer->tokens = realloc(buffer->tokens, sizeof(struct qxc_token) *
+//         new_capacity); buffer->capacity = new_capacity;
+//     }
+//
+//     struct qxc_token* new_token = &buffer->tokens[buffer->length];
+//     new_token->type = INVALID_TOKEN;
+//     new_token->line = -1;
+//     new_token->column = -1;
+//     new_token->name[0] = '\0';
+//     new_token->int_literal_value = 0;
+//     new_token->keyword = INVALID_KEYWORD;
+//     new_token->op = INVALID_OP;
+//
+//     buffer->length++;
+//     return new_token;
+// }
+//

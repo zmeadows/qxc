@@ -1,13 +1,11 @@
 #pragma once
 
+#include "darray.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 
-enum qxc_keyword {
-    RETURN_KEYWORD,
-    INT_KEYWORD,
-    INVALID_KEYWORD
-};
+enum qxc_keyword { RETURN_KEYWORD, INT_KEYWORD, INVALID_KEYWORD };
 
 const char* qxc_keyword_to_str(enum qxc_keyword keyword);
 enum qxc_keyword qxc_str_to_keyword(const char* kstr);
@@ -64,12 +62,5 @@ struct qxc_token {
 
 void qxc_token_print(struct qxc_token* token);
 
-struct qxc_token_buffer {
-    struct qxc_token* tokens;
-    size_t capacity;
-    size_t length;
-};
+DECLARE_DYNAMIC_ARRAY_NEWTYPE(qxc_token_array, struct qxc_token)
 
-struct qxc_token_buffer* qxc_token_buffer_alloc(void);
-void qxc_token_buffer_free(struct qxc_token_buffer* buffer);
-struct qxc_token* qxc_token_buffer_extend(struct qxc_token_buffer* buffer);

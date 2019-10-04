@@ -14,7 +14,6 @@
 #include <string.h>
 #include <unistd.h>
 
-// TODO: capitalize
 enum qxc_mode { TOKENIZE_MODE, PARSE_MODE, COMPILE_MODE };
 
 struct qxc_context {
@@ -110,14 +109,14 @@ static void qxc_context_deinit(struct qxc_context* ctx) { rm_tmp_dir(ctx->work_d
 static int qxc_context_run(const struct qxc_context* ctx)
 {
     if (ctx->mode == TOKENIZE_MODE) {
-        struct qxc_token_buffer* tokens = qxc_tokenize(ctx->canonical_input_filepath);
+        struct qxc_token_array* tokens = qxc_tokenize(ctx->canonical_input_filepath);
         if (tokens == NULL) {
             fprintf(stderr, "lexure failure\n");
             return -1;
         }
         printf("=== TOKENS ===\n");
         for (size_t i = 0; i < tokens->length; i++) {
-            qxc_token_print(&tokens->tokens[i]);
+            qxc_token_print(qxc_token_array_at(tokens, i));
         }
         return 0;
     }

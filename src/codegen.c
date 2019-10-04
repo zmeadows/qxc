@@ -3,6 +3,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+struct qxc_stack_map {
+    const char** vars;
+    size_t* indices;
+    const size_t count;
+};
+
 struct qxc_codegen {
     FILE* asm_output;
     size_t indent_level;

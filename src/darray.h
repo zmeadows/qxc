@@ -39,7 +39,13 @@
         return &arr->data[arr->length++];                                      \
     }                                                                          \
                                                                                \
-    STORAGE void NEW_TYPE##_free(struct NEW_TYPE* arr) { free(arr->data); }    \
+    STORAGE void NEW_TYPE##_free(struct NEW_TYPE* arr)                         \
+    {                                                                          \
+        free(arr->data);                                                       \
+        arr->data = NULL;                                                      \
+        arr->length = 0;                                                       \
+        arr->capacity = 0;                                                     \
+    }                                                                          \
                                                                                \
     STORAGE ITEM_TYPE* NEW_TYPE##_at(struct NEW_TYPE* arr, size_t i)           \
     {                                                                          \

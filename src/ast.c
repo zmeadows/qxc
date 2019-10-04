@@ -24,6 +24,7 @@
 // <unary_op> ::= "!" | "~" | "-"
 
 struct qxc_parser {
+    struct qxc_memory_pool* ast_memory_pool;
     struct qxc_token_array* token_buffer;
     size_t itoken;
 };
@@ -45,42 +46,48 @@ struct qxc_parser {
         }                \
     } while (0)
 
-static inline struct qxc_ast_expression_node* alloc_empty_expression(void)
+static inline struct qxc_ast_expression_node* alloc_empty_expression(
+    struct qxc_parser* parser)
 {
     struct qxc_ast_expression_node* expr =
-        qxc_calloc(sizeof(struct qxc_ast_expression_node));
+        qxc_malloc(parser->ast_memory_pool, sizeof(struct qxc_ast_expression_node));
     expr->type = INVALID_EXPR;
     return expr;
 }
 
-static inline struct qxc_ast_statement_node* alloc_empty_statement(void)
+static inline struct qxc_ast_statement_node* alloc_empty_statement(
+    struct qxc_parser* parser)
 {
     struct qxc_ast_statement_node* statement =
-        qxc_calloc(sizeof(struct qxc_ast_statement_node));
+        qxc_malloc(parser->ast_memory_pool, sizeof(struct qxc_ast_statement_node));
     statement->type = INVALID_STATEMENT;
     return statement;
 }
 
-static inline struct qxc_statement_list* alloc_empty_statement_list(void)
+static inline struct qxc_statement_list* alloc_empty_statement_list(
+    struct qxc_parser* parser)
 {
-    struct qxc_statement_list* slist = qxc_malloc(sizeof(struct qxc_statement_list));
+    struct qxc_statement_list* slist =
+        qxc_malloc(parser->ast_memory_pool, sizeof(struct qxc_statement_list));
     slist->node = NULL;
     slist->next_node = NULL;
     return slist;
 }
 
-static inline struct qxc_ast_function_decl_node* alloc_empty_function_decl(void)
+static inline struct qxc_ast_function_decl_node* alloc_empty_function_decl(
+    struct qxc_parser* parser)
 {
     struct qxc_ast_function_decl_node* decl =
-        qxc_malloc(sizeof(struct qxc_ast_function_decl_node));
+        qxc_malloc(parser->ast_memory_pool, sizeof(struct qxc_ast_function_decl_node));
 
-    decl->slist = alloc_empty_statement_list();
+    decl->slist = alloc_empty_statement_list(parser);
     decl->name = NULL;
 
     return decl;
 }
 
-static void qxc_statement_list_append(struct qxc_statement_list* slist,
+static void qxc_statement_list_append(struct qxc_parser* parser,
+                                      struct qxc_statement_list* slist,
                                       struct qxc_ast_statement_node* statement_to_append)
 {
     while (slist->node) {
@@ -88,7 +95,7 @@ static void qxc_statement_list_append(struct qxc_statement_list* slist,
     }
 
     slist->node = statement_to_append;
-    slist->next_node = alloc_empty_statement_list();
+    slist->next_node = alloc_empty_statement_list(parser);
 }
 
 static void rewind_token_buffer(struct qxc_parser* parser, size_t count)
@@ -155,7 +162,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser*, 
 
 static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parser)
 {
-    struct qxc_ast_expression_node* factor = alloc_empty_expression();
+    struct qxc_ast_expression_node* factor = alloc_empty_expression(parser);
 
     struct qxc_token* next_token = pop_next_token(parser);
     switch (next_token->type) {
@@ -248,7 +255,8 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
             (void)pop_next_token(parser);
             debug_print("parsing assignment of var: %s", id_token->name);
 
-            struct qxc_ast_expression_node* assignment_expr = alloc_empty_expression();
+            struct qxc_ast_expression_node* assignment_expr =
+                alloc_empty_expression(parser);
             assignment_expr->type = ASSIGNMENT_EXPR;
             assignment_expr->assignee_var_name = id_token->name;
             assignment_expr->assignment_expr = qxc_parse_expression(parser, -1);
@@ -283,7 +291,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
             qxc_parse_expression(parser, next_op_precedence);  // descend
         EXPECT_(right_expr);
 
-        struct qxc_ast_expression_node* binop_expr = alloc_empty_expression();
+        struct qxc_ast_expression_node* binop_expr = alloc_empty_expression(parser);
         binop_expr->type = BINARY_OP_EXPR;
         binop_expr->binop = next_token->op;
         binop_expr->left_expr = left_expr;
@@ -300,7 +308,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
 
 static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
 {
-    struct qxc_ast_statement_node* statement = alloc_empty_statement();
+    struct qxc_ast_statement_node* statement = alloc_empty_statement(parser);
 
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT(next_token, "Expected a statement here!");
@@ -325,7 +333,7 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
         debug_print("parsing declaration of int var: %s", next_token->name);
 
         const size_t id_len = strlen(next_token->name) + 1;  // includes \0 terminator
-        statement->var_name = qxc_malloc(id_len);
+        statement->var_name = qxc_malloc(parser->ast_memory_pool, id_len);
         memcpy(statement->var_name, next_token->name, id_len);
 
         // FIXME: remember to check that next_token isn't null in all these if
@@ -368,14 +376,14 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
     EXPECT(qxc_parser_expect_token_type(parser, OPEN_BRACE_TOKEN),
            "Missing open brace token");
 
-    struct qxc_ast_function_decl_node* decl = alloc_empty_function_decl();
+    struct qxc_ast_function_decl_node* decl = alloc_empty_function_decl(parser);
     decl->name = func_name;
 
     bool found_return_statement = false;
     while (peek_next_token(parser)->type != CLOSE_BRACE_TOKEN) {
         struct qxc_ast_statement_node* next_statement = qxc_parse_statement(parser);
         EXPECT(next_statement, "Failed to parse statement in function: %s", func_name);
-        qxc_statement_list_append(decl->slist, next_statement);
+        qxc_statement_list_append(parser, decl->slist, next_statement);
         debug_print("successfully parsed statement");
         if (next_statement->type == RETURN_STATEMENT) {
             found_return_statement = true;
@@ -399,6 +407,8 @@ struct qxc_program* qxc_parse(const char* filepath)
 {
     struct qxc_parser parser;
 
+    parser.ast_memory_pool = qxc_memory_pool_init((size_t)1e3 * 500);
+
     parser.token_buffer = qxc_tokenize(filepath);
     if (!parser.token_buffer) {
         return NULL;
@@ -415,7 +425,8 @@ struct qxc_program* qxc_parse(const char* filepath)
 
     EXPECT(main_decl, "Failed to parse main function declaration");
 
-    struct qxc_program* program = qxc_malloc(sizeof(struct qxc_program));
+    struct qxc_program* program =
+        qxc_malloc(parser.ast_memory_pool, sizeof(struct qxc_program));
     program->main_decl = main_decl;
 
     qxc_token_array_free(parser.token_buffer);

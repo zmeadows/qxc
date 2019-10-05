@@ -1,5 +1,7 @@
 #include "allocator.h"
 
+#include "prelude.h"
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,19 +20,13 @@ struct qxc_memory_arena_chain {
     struct qxc_memory_arena_chain* prev_link;
 };
 
-static inline size_t arena_size_bytes(struct qxc_memory_arena_chain* arena)
-{
-    assert(arena->end > arena->start);
-    return (size_t)((int64_t)arena->end - (int64_t)arena->start);
-}
-
 static void allocate_arena_chain_link(struct qxc_memory_pool* pool)
 {
     struct qxc_memory_arena_chain* old_tip = pool->chain_tip;
 
     struct qxc_memory_arena_chain* new_tip =
         malloc(sizeof(struct qxc_memory_arena_chain));
-    new_tip->start = malloc(pool->arena_size);
+    new_tip->start = calloc(pool->arena_size, 1);
     new_tip->end = new_tip->start + pool->arena_size;
     new_tip->bump_ptr = new_tip->start;
     new_tip->prev_link = old_tip;
@@ -50,9 +46,6 @@ struct qxc_memory_pool* qxc_memory_pool_init(size_t arena_size_bytes)
 void* qxc_malloc(struct qxc_memory_pool* pool, size_t bytes)
 {
     struct qxc_memory_arena_chain* tip = pool->chain_tip;
-
-    // size_t arena_size = tip->end - tip->start;
-    // assert(bytes < arena_size);
 
     // TODO: exit condition for failure
     while (1) {

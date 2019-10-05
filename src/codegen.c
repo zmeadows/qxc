@@ -235,12 +235,14 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     emit(&gen, "_start:");
     gen.indent_level++;
 
-    struct qxc_statement_list* s = program->main_decl->slist;
-    while (s->next_node != NULL) {
-        generate_statement_asm(&gen, s->node);
-        s = s->next_node;
+    if (program->main_decl != NULL) {
+        struct qxc_statement_list* s = program->main_decl->slist;
+        while (s != NULL && s->node != NULL) {
+            generate_statement_asm(&gen, s->node);
+            s = s->next_node;
+        }
+        gen.indent_level--;
     }
-    gen.indent_level--;
 
     fclose(gen.asm_output);
 }

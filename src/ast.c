@@ -90,7 +90,7 @@ static void qxc_statement_list_append(struct qxc_parser* parser,
                                       struct qxc_statement_list* slist,
                                       struct qxc_ast_statement_node* statement_to_append)
 {
-    while (slist->node) {
+    while (slist->node != NULL) {
         slist = slist->next_node;
     }
 
@@ -407,13 +407,12 @@ struct qxc_program* qxc_parse(const char* filepath)
 {
     struct qxc_parser parser;
 
-    parser.ast_memory_pool = qxc_memory_pool_init((size_t)1e3 * 500);
-
+    parser.ast_memory_pool = qxc_memory_pool_init(500e3);
     parser.token_buffer = qxc_tokenize(filepath);
-    if (!parser.token_buffer) {
-        return NULL;
-    }
     parser.itoken = 0;
+
+    EXPECT_(parser.ast_memory_pool);
+    EXPECT_(parser.token_buffer);
 
     EXPECT(qxc_parser_expect_keyword(&parser, INT_KEYWORD),
            "Invalid main type signature, must return int.");
@@ -429,6 +428,6 @@ struct qxc_program* qxc_parse(const char* filepath)
         qxc_malloc(parser.ast_memory_pool, sizeof(struct qxc_program));
     program->main_decl = main_decl;
 
-    qxc_token_array_free(parser.token_buffer);
+    // qxc_token_array_free(parser.token_buffer);
     return program;
 }

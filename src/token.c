@@ -68,20 +68,8 @@ const char* qxc_operator_to_str(enum qxc_operator op)
     }
 }
 
-// enum qxc_operator str_to_qxc_operator(const char* opstr)
-// {
-//     if (strs_are_equal("-", opstr)) {
-//         return MINUS_OP;
-//     }
-//     else if (strs_are_equal("+", opstr)) {
-//         return PLUS_OP;
-//     }
-//     else if (strs_are_equal("/", opstr)) {
-//         return DIVIDE_OP;
-//     }
-// }
-
-// TODO: eventually multiply_op will serve as unary pointer dereference operator as well
+// TODO: eventually multiply_op will serve as
+// unary pointer dereference operator as well
 bool qxc_operator_can_be_unary(enum qxc_operator op)
 {
     switch (op) {

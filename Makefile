@@ -27,7 +27,6 @@ MYCFLAGS = -Wall \
 		   -pedantic \
 		   -D_DEFAULT_SOURCE \
 		   -g \
-		   -Og \
 		   -std=c11 \
 
 MYLIBS   = -lm

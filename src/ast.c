@@ -405,12 +405,13 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
 struct qxc_program* qxc_parse(const char* filepath)
 {
     struct qxc_parser parser;
+    qxc_token_array_init(&parser.token_buffer, 256);
 
     if (qxc_tokenize(&parser.token_buffer, filepath) != 0) {
         return NULL;
     }
 
-    parser.ast_memory_pool = qxc_memory_pool_init(500e3);
+    parser.ast_memory_pool = qxc_memory_pool_init(50e3);
     if (parser.ast_memory_pool == NULL) {
         return NULL;
     }

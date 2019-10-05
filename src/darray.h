@@ -13,7 +13,8 @@
     void NEW_TYPE##_init(struct NEW_TYPE* arr, size_t init_capacity); \
     ITEM_TYPE* NEW_TYPE##_extend(struct NEW_TYPE* arr);               \
     void NEW_TYPE##_free(struct NEW_TYPE* arr);                       \
-    ITEM_TYPE* NEW_TYPE##_at(struct NEW_TYPE* arr, size_t i);
+    ITEM_TYPE* NEW_TYPE##_at(struct NEW_TYPE* arr, size_t i);         \
+    void NEW_TYPE##_clear(struct NEW_TYPE* arr);
 
 #define IMPLEMENT_DYNAMIC_ARRAY_NEWTYPE__(NEW_TYPE, ITEM_TYPE, STORAGE)        \
     STORAGE void NEW_TYPE##_init(struct NEW_TYPE* arr, size_t init_capacity)   \
@@ -46,6 +47,8 @@
         arr->length = 0;                                                       \
         arr->capacity = 0;                                                     \
     }                                                                          \
+                                                                               \
+    STORAGE void NEW_TYPE##_clear(struct NEW_TYPE* arr) { arr->length = 0; }   \
                                                                                \
     STORAGE ITEM_TYPE* NEW_TYPE##_at(struct NEW_TYPE* arr, size_t i)           \
     {                                                                          \

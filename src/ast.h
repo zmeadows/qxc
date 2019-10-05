@@ -1,5 +1,6 @@
 #pragma once
 
+#include "allocator.h"
 #include "prelude.h"
 #include "token.h"
 
@@ -80,6 +81,7 @@ struct qxc_ast_function_decl_node {
 
 struct qxc_program {  // program
     struct qxc_ast_function_decl_node* main_decl;
+    struct qxc_memory_pool* ast_memory_pool;
 };
 
 struct qxc_program* qxc_parse(const char* filepath);

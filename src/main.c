@@ -109,19 +109,16 @@ static void qxc_context_deinit(struct qxc_context* ctx) { rm_tmp_dir(ctx->work_d
 static int qxc_context_run(const struct qxc_context* ctx)
 {
     if (ctx->mode == TOKENIZE_MODE) {
-        struct qxc_memory_pool* tmp_pool = qxc_memory_pool_init(10e3);
-        struct qxc_token_array* tokens =
-            qxc_tokenize(tmp_pool, ctx->canonical_input_filepath);
-        if (tokens == NULL) {
+        struct qxc_token_array tokens;
+        qxc_token_array_init(&tokens, 256);
+        if (qxc_tokenize(&tokens, ctx->canonical_input_filepath) != 0) {
             fprintf(stderr, "lexure failure\n");
-            qxc_memory_pool_release(tmp_pool);
             return -1;
         }
         printf("=== TOKENS ===\n");
-        for (size_t i = 0; i < tokens->length; i++) {
-            qxc_token_print(qxc_token_array_at(tokens, i));
+        for (size_t i = 0; i < tokens.length; i++) {
+            qxc_token_print(qxc_token_array_at(&tokens, i));
         }
-        qxc_memory_pool_release(tmp_pool);
         return 0;
     }
 

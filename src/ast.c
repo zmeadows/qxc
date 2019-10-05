@@ -1,5 +1,4 @@
 #include "ast.h"
-#include "allocator.h"
 #include "lexer.h"
 #include "prelude.h"
 #include "token.h"
@@ -25,7 +24,7 @@
 
 struct qxc_parser {
     struct qxc_memory_pool* ast_memory_pool;
-    struct qxc_token_array* token_buffer;
+    struct qxc_token_array token_buffer;
     size_t itoken;
 };
 
@@ -108,8 +107,8 @@ static void rewind_token_buffer(struct qxc_parser* parser, size_t count)
 
 static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 {
-    if (parser->itoken < parser->token_buffer->length) {
-        return qxc_token_array_at(parser->token_buffer, parser->itoken++);
+    if (parser->itoken < parser->token_buffer.length) {
+        return qxc_token_array_at(&parser->token_buffer, parser->itoken++);
     }
     else {
         return NULL;
@@ -118,8 +117,8 @@ static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 
 static struct qxc_token* peek_next_token(struct qxc_parser* parser)
 {
-    if (parser->itoken < parser->token_buffer->length) {
-        return qxc_token_array_at(parser->token_buffer, parser->itoken);
+    if (parser->itoken < parser->token_buffer.length) {
+        return qxc_token_array_at(&parser->token_buffer, parser->itoken);
     }
     else {
         return NULL;
@@ -407,12 +406,16 @@ struct qxc_program* qxc_parse(const char* filepath)
 {
     struct qxc_parser parser;
 
-    parser.ast_memory_pool = qxc_memory_pool_init(500e3);
-    parser.token_buffer = qxc_tokenize(filepath);
-    parser.itoken = 0;
+    if (qxc_tokenize(&parser.token_buffer, filepath) != 0) {
+        return NULL;
+    }
 
-    EXPECT_(parser.ast_memory_pool);
-    EXPECT_(parser.token_buffer);
+    parser.ast_memory_pool = qxc_memory_pool_init(500e3);
+    if (parser.ast_memory_pool == NULL) {
+        return NULL;
+    }
+
+    parser.itoken = 0;
 
     EXPECT(qxc_parser_expect_keyword(&parser, INT_KEYWORD),
            "Invalid main type signature, must return int.");
@@ -424,10 +427,12 @@ struct qxc_program* qxc_parse(const char* filepath)
 
     EXPECT(main_decl, "Failed to parse main function declaration");
 
+    qxc_token_array_free(&parser.token_buffer);  // finished with tokens now
+
     struct qxc_program* program =
         qxc_malloc(parser.ast_memory_pool, sizeof(struct qxc_program));
     program->main_decl = main_decl;
+    program->ast_memory_pool = parser.ast_memory_pool;
 
-    // qxc_token_array_free(parser.token_buffer);
     return program;
 }

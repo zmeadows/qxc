@@ -4,4 +4,4 @@
 
 #include "prelude.h"
 
-struct qxc_token_array* qxc_tokenize(const char* filepath);
+int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath);

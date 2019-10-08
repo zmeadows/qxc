@@ -7,6 +7,8 @@
 #include "darray.h"
 #include "prelude.h"
 
+IMPLEMENT_DYNAMIC_ARRAY_NEWTYPE(qxc_token_array, struct qxc_token)
+
 const char* qxc_keyword_to_str(enum qxc_keyword keyword)
 {
     switch (keyword) {
@@ -138,6 +140,4 @@ void qxc_token_print(struct qxc_token* token)
 
     printf("\n");
 }
-
-IMPLEMENT_DYNAMIC_ARRAY_NEWTYPE(qxc_token_array, struct qxc_token)
 

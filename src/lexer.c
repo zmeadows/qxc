@@ -12,8 +12,6 @@
 
 #define QXC_MAXIMUM_IDENTIFIER_LENGTH 256
 
-// TODO: convert tokenizer/token_buffer to use qxc_malloc
-
 struct qxc_tokenizer {
     // TODO: store identifiers in a hash set/table and use one pointer per identifier
     // maybe table of const char* -> list of all locations of identifier/keyword?
@@ -234,11 +232,6 @@ static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
 
 int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
 {
-    if (token_buffer == NULL) {
-        debug_print("token_buffer argument is NULL");
-        return -1;
-    }
-
     qxc_token_array_clear(token_buffer);
 
     struct qxc_tokenizer tokenizer;

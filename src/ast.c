@@ -246,7 +246,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
     struct qxc_token* next_token = peek_next_token(parser);
 
     if (next_token->type == IDENTIFIER_TOKEN) {
-        // either a variable reference or variable assignment
+        // encountered either a variable reference or variable assignment
         struct qxc_token* id_token = pop_next_token(parser);
         next_token = peek_next_token(parser);
 
@@ -313,18 +313,14 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
     EXPECT(next_token, "Expected a statement here!");
 
     if (next_token->type == KEYWORD_TOKEN && next_token->keyword == RETURN_KEYWORD) {
-        // return statement
-        EXPECT(qxc_parser_expect_keyword(parser, RETURN_KEYWORD),
-               "Only return statements currently allowed.");
-
+        pop_next_token(parser);  // pop off return keyword
         statement->type = RETURN_STATEMENT;
         statement->return_expr = qxc_parse_expression(parser, 0);
-
         EXPECT(statement->return_expr, "Expression parsing failed");
     }
     else if (next_token->type == KEYWORD_TOKEN && next_token->keyword == INT_KEYWORD) {
+        pop_next_token(parser);  // pop off int keyword
         statement->type = DECLARATION_STATEMENT;
-        pop_next_token(parser);               // pop off int keyword
         next_token = pop_next_token(parser);  // pop off identifier
         EXPECT(next_token && next_token->type == IDENTIFIER_TOKEN,
                "Invalid identifier found for variable declaration name");

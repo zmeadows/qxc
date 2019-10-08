@@ -3,11 +3,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-struct qxc_stack_map {
-    const char** vars;
-    size_t* indices;
-    const size_t count;
-};
+#include "flat_map.h"
 
 struct qxc_codegen {
     FILE* asm_output;
@@ -21,6 +17,16 @@ struct qxc_codegen {
     char logical_and_jump_label[256];
     char logical_and_end_label[256];
 };
+
+// static uint64_t qxc_hash_str(const char* str)
+// {
+//     uint64_t hash = 5381;
+//     unsigned char c;
+//
+//     while ((c = (unsigned char)*str++)) hash = ((hash << 5) + hash) + c;
+//
+//     return hash;
+// }
 
 static void qxc_codegen_increment_logical_or_count(struct qxc_codegen* gen)
 {

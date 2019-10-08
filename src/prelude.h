@@ -28,3 +28,10 @@ const char* mk_tmp_dir(void);
 void rm_tmp_dir(const char* tmp_path);
 
 size_t max(size_t a, size_t b);
+
+// struct qxc_small_str {
+//     char storage[16];
+//     char* contents;
+//     size_t capacity;
+//     size_t length;
+// };

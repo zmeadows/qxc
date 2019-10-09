@@ -35,3 +35,13 @@ size_t max(size_t a, size_t b);
 //     size_t capacity;
 //     size_t length;
 // };
+//
+// static uint64_t qxc_hash_str(const char* str)
+// {
+//     uint64_t hash = 5381;
+//     unsigned char c;
+//
+//     while ((c = (unsigned char)*str++)) hash = ((hash << 5) + hash) + c;
+//
+//     return hash;
+// }

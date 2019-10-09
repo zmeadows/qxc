@@ -127,11 +127,9 @@ static int qxc_context_run(const struct qxc_context* ctx)
         return -1;
     }
 
-    // printf("%p\n", (void*)program->main_decl->slist);
-    // if (ctx->verbose) {
-    //     print_program(program);
-    // }
-    // printf("%p\n", (void*)program->main_decl->slist);
+    if (ctx->verbose) {
+        print_program(program);
+    }
 
     generate_asm(program, ctx->output_assembly_path);
 

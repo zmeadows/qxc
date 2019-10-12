@@ -29,6 +29,8 @@ void rm_tmp_dir(const char* tmp_path);
 
 size_t max(size_t a, size_t b);
 
+void print_file(const char* filepath);
+
 // struct qxc_small_str {
 //     char storage[16];
 //     char* contents;

@@ -105,4 +105,5 @@ void print_program(struct qxc_program* program)
 {
     indent_level = 0;
     print_function_decl(program->main_decl);
+    printf("\n");
 }

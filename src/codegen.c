@@ -18,7 +18,7 @@ static struct qxc_stack_offsets qxc_stack_offsets_new(void)
 {
     struct qxc_stack_offsets offsets;
     offsets.count = 0;
-    offsets.stack_index = 0;
+    offsets.stack_index = -8;
     return offsets;
 }
 
@@ -162,12 +162,20 @@ static void generate_expression_asm(struct qxc_codegen* gen,
                         emit(gen, "je %s", gen->logical_or_jump_label);
                         emit(gen, "mov rax, 1");
                         emit(gen, "jmp %s", gen->logical_or_end_label);
-                        emit(gen, "%s:", gen->logical_or_jump_label);
+
+                        const size_t old_indent_level = gen->indent_level;
+                        gen->indent_level = 0;
+                        emit(gen, "\n%s:", gen->logical_or_jump_label);
+                        gen->indent_level = old_indent_level;
+
                         generate_expression_asm(gen, offsets, expr->right_expr);
                         emit(gen, "cmp rax, 0");
                         emit(gen, "mov rax, 0");
                         emit(gen, "setne al");
-                        emit(gen, "%s:", gen->logical_or_end_label);
+
+                        gen->indent_level = 0;
+                        emit(gen, "\n%s:", gen->logical_or_end_label);
+                        gen->indent_level = old_indent_level;
 
                         qxc_codegen_increment_logical_or_count(gen);
                         break;
@@ -176,12 +184,20 @@ static void generate_expression_asm(struct qxc_codegen* gen,
                         emit(gen, "cmp rax, 0");
                         emit(gen, "jne %s", gen->logical_and_jump_label);
                         emit(gen, "jmp %s", gen->logical_and_end_label);
+
+                        const size_t _old_indent_level = gen->indent_level;
+                        gen->indent_level = 0;
                         emit(gen, "%s:", gen->logical_and_jump_label);
+                        gen->indent_level = _old_indent_level;
+
                         generate_expression_asm(gen, offsets, expr->right_expr);
                         emit(gen, "cmp rax, 0");
                         emit(gen, "mov rax, 0");
                         emit(gen, "setne al");
+
+                        gen->indent_level = 0;
                         emit(gen, "%s:", gen->logical_and_end_label);
+                        gen->indent_level = _old_indent_level;
 
                         qxc_codegen_increment_logical_and_count(gen);
                         break;
@@ -251,6 +267,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
 
         case ASSIGNMENT_EXPR:
             generate_expression_asm(gen, offsets, expr->assignment_expr);
+
             if (!qxc_stack_offsets_contains(offsets, expr->assignee_var_name)) {
                 fprintf(stderr, "assigning to un-initialized variable: %s\n",
                         expr->assignee_var_name);
@@ -323,6 +340,8 @@ static void generate_statement_asm(struct qxc_codegen* gen,
     return;
 }
 
+// static void generate_function_asm(struct qxc_godegen* gen) {}
+
 void generate_asm(struct qxc_program* program, const char* output_filepath)
 {
     struct qxc_codegen gen;
@@ -342,7 +361,7 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     emit(&gen, "global _start");
     emit(&gen, "section .text");
     gen.indent_level--;
-    emit(&gen, "_start:");
+    emit(&gen, "\n_start:");
     gen.indent_level++;
 
     emit(&gen, "push rbp");
@@ -358,8 +377,13 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
             generate_statement_asm(&gen, &offsets, s->node);
             s = s->next_node;
         }
-        gen.indent_level--;
     }
+
+    emit(&gen, "");
+    emit(&gen, "mov rsp, rbp");
+    emit(&gen, "pop rbp");
+    emit(&gen, "ret");
+    gen.indent_level--;
 
     fclose(gen.asm_output);
 }

@@ -3,28 +3,33 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define DECLARE_DYNAMIC_ARRAY_NEWTYPE(NEW_TYPE, ITEM_TYPE)            \
-    struct NEW_TYPE {                                                 \
-        ITEM_TYPE* data;                                              \
-        size_t capacity;                                              \
-        size_t length;                                                \
-        double growth_factor;                                         \
-    };                                                                \
-    void NEW_TYPE##_init(struct NEW_TYPE* arr, size_t init_capacity); \
-    ITEM_TYPE* NEW_TYPE##_extend(struct NEW_TYPE* arr);               \
-    void NEW_TYPE##_free(struct NEW_TYPE* arr);                       \
-    ITEM_TYPE* NEW_TYPE##_at(struct NEW_TYPE* arr, size_t i);         \
+#define DECLARE_DYNAMIC_ARRAY_NEWTYPE(NEW_TYPE, ITEM_TYPE)           \
+    struct NEW_TYPE {                                                \
+        ITEM_TYPE* data;                                             \
+        size_t capacity;                                             \
+        size_t length;                                               \
+        double growth_factor;                                        \
+    };                                                               \
+    int NEW_TYPE##_init(struct NEW_TYPE* arr, size_t init_capacity); \
+    ITEM_TYPE* NEW_TYPE##_extend(struct NEW_TYPE* arr);              \
+    void NEW_TYPE##_free(struct NEW_TYPE* arr);                      \
+    ITEM_TYPE* NEW_TYPE##_at(struct NEW_TYPE* arr, size_t i);        \
     void NEW_TYPE##_clear(struct NEW_TYPE* arr);
 
 #define IMPLEMENT_DYNAMIC_ARRAY_NEWTYPE__(NEW_TYPE, ITEM_TYPE, STORAGE)        \
-    STORAGE void NEW_TYPE##_init(struct NEW_TYPE* arr, size_t init_capacity)   \
+    STORAGE int NEW_TYPE##_init(struct NEW_TYPE* arr, size_t init_capacity)    \
     {                                                                          \
+        arr->growth_factor = 1.61803398875;                                    \
         init_capacity = init_capacity == 0 ? 1 : init_capacity;                \
-                                                                               \
         arr->data = malloc(init_capacity * sizeof(ITEM_TYPE));                 \
+        if (arr->data == NULL) {                                               \
+            arr->capacity = 0;                                                 \
+            arr->length = 0;                                                   \
+            return -1;                                                         \
+        }                                                                      \
         arr->capacity = init_capacity;                                         \
         arr->length = 0;                                                       \
-        arr->growth_factor = 1.61803398875;                                    \
+        return 0;                                                              \
     }                                                                          \
                                                                                \
     STORAGE ITEM_TYPE* NEW_TYPE##_extend(struct NEW_TYPE* arr)                 \

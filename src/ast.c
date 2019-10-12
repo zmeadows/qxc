@@ -361,39 +361,47 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
 }
 
 static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
-    struct qxc_parser* parser, const char* func_name)
+    struct qxc_parser* parser)
 {
+    EXPECT(qxc_parser_expect_keyword(parser, INT_KEYWORD),
+           "Invalid main type signature, must return int.");
+
+    EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");
+
     EXPECT(qxc_parser_expect_token_type(parser, OPEN_PAREN_TOKEN),
            "Missing open parenthesis");
+
     // arg parsing would go here, if we allowed function arguments yet
+
     EXPECT(qxc_parser_expect_token_type(parser, CLOSE_PAREN_TOKEN),
            "Missing close parenthesis");
+
     EXPECT(qxc_parser_expect_token_type(parser, OPEN_BRACE_TOKEN),
            "Missing open brace token");
 
     struct qxc_ast_function_decl_node* decl = alloc_empty_function_decl(parser);
-    decl->name = func_name;
+    decl->name = "main";
 
-    bool found_return_statement = false;
+    // bool found_return_statement = false;
     while (peek_next_token(parser)->type != CLOSE_BRACE_TOKEN) {
         struct qxc_ast_statement_node* next_statement = qxc_parse_statement(parser);
-        EXPECT(next_statement, "Failed to parse statement in function: %s", func_name);
+        EXPECT(next_statement, "Failed to parse statement in function: main");
         qxc_statement_list_append(parser, decl->slist, next_statement);
         debug_print("successfully parsed statement");
-        if (next_statement->type == RETURN_STATEMENT) {
-            found_return_statement = true;
-        }
+        // if (next_statement->type == RETURN_STATEMENT) {
+        //     found_return_statement = true;
+        // }
     }
 
-    EXPECT(found_return_statement,
-           "No return statement in function with non-void return type!");
+    // EXPECT(found_return_statement,
+    //        "No return statement in function with non-void return type!");
 
     // TODO : check for errors on each statement parse
-    EXPECT(decl->slist->node, "failed to parse any statements in function body of %s",
-           func_name);
+    // EXPECT(decl->slist->node, "failed to parse any statements in function body of
+    // main");
 
     EXPECT(qxc_parser_expect_token_type(parser, CLOSE_BRACE_TOKEN),
-           "Missing close brace token at end of function: %s", func_name);
+           "Missing close brace token at end of function: main");
 
     return decl;
 }
@@ -401,26 +409,24 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
 struct qxc_program* qxc_parse(const char* filepath)
 {
     struct qxc_parser parser;
-    qxc_token_array_init(&parser.token_buffer, 256);
 
-    if (qxc_tokenize(&parser.token_buffer, filepath) != 0) {
+    parser.ast_memory_pool = qxc_memory_pool_init(10e3);
+    if (parser.ast_memory_pool == NULL) {
         return NULL;
     }
 
-    parser.ast_memory_pool = qxc_memory_pool_init(50e3);
-    if (parser.ast_memory_pool == NULL) {
+    if (qxc_token_array_init(&parser.token_buffer, 256) != 0) {
+        return NULL;
+    }
+
+    if (qxc_tokenize(&parser.token_buffer, filepath) != 0) {
+        qxc_token_array_free(&parser.token_buffer);  // finished with tokens now
         return NULL;
     }
 
     parser.itoken = 0;
 
-    EXPECT(qxc_parser_expect_keyword(&parser, INT_KEYWORD),
-           "Invalid main type signature, must return int.");
-
-    EXPECT(qxc_parser_expect_identifier(&parser, "main"), "Invalid main function name");
-
-    struct qxc_ast_function_decl_node* main_decl =
-        qxc_parse_function_decl(&parser, "main");
+    struct qxc_ast_function_decl_node* main_decl = qxc_parse_function_decl(&parser);
 
     EXPECT(main_decl, "Failed to parse main function declaration");
 

@@ -5,7 +5,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-enum qxc_keyword { RETURN_KEYWORD, INT_KEYWORD, INVALID_KEYWORD };
+enum qxc_keyword {
+    RETURN_KEYWORD,
+    INT_KEYWORD,
+    IF_KEYWORD,
+    ELSE_KEYWORD,
+    INVALID_KEYWORD
+};
 
 const char* qxc_keyword_to_str(enum qxc_keyword keyword);
 enum qxc_keyword qxc_str_to_keyword(const char* kstr);
@@ -21,6 +27,8 @@ enum qxc_operator {
     LOGICAL_OR_OP,
     EQUAL_TO_OP,
     NOT_EQUAL_TO_OP,
+    COLON_OP,
+    QUESTION_MARK_OP,
     LESS_THAN_OP,
     LESS_THAN_OR_EQUAL_TO_OP,
     GREATER_THAN_OP,

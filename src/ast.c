@@ -331,8 +331,6 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
         statement->var_name = qxc_malloc(parser->ast_memory_pool, id_len);
         memcpy(statement->var_name, next_token->name, id_len);
 
-        // FIXME: remember to check that next_token isn't null in all these if
-        // (next_token->type == blah) type branches
         next_token = peek_next_token(parser);
         if (next_token && next_token->type == ASSIGNMENT_TOKEN) {
             pop_next_token(parser);  // pop off '='

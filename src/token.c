@@ -16,6 +16,10 @@ const char* qxc_keyword_to_str(enum qxc_keyword keyword)
             return "return";
         case INT_KEYWORD:
             return "int";
+        case IF_KEYWORD:
+            return "if";
+        case ELSE_KEYWORD:
+            return "else";
         default:
             return NULL;
     }
@@ -28,6 +32,12 @@ enum qxc_keyword qxc_str_to_keyword(const char* kstr)
     }
     else if (strs_are_equal("int", kstr)) {
         return INT_KEYWORD;
+    }
+    else if (strs_are_equal("if", kstr)) {
+        return IF_KEYWORD;
+    }
+    else if (strs_are_equal("else", kstr)) {
+        return ELSE_KEYWORD;
     }
     else {
         return INVALID_KEYWORD;
@@ -65,6 +75,10 @@ const char* qxc_operator_to_str(enum qxc_operator op)
             return ">";
         case GREATER_THAN_OR_EQUAL_TO_OP:
             return ">=";
+        case COLON_OP:
+            return ":";
+        case QUESTION_MARK_OP:
+            return "?";
         default:
             return NULL;
     }

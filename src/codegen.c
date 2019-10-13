@@ -18,7 +18,8 @@ static struct qxc_stack_offsets qxc_stack_offsets_new(void)
 {
     struct qxc_stack_offsets offsets;
     offsets.count = 0;
-    offsets.stack_index = -8;
+    offsets.stack_index = -8;  // base of callers stack frame always saved as first entry
+                               // of calee's stack frame, so start with -8 rather than 0
     return offsets;
 }
 

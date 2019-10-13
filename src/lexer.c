@@ -82,7 +82,7 @@ static inline bool is_valid_keyword_identifier_first_character(char c)
 
 static inline bool is_valid_operator_first_character(char c)
 {
-    return c != '\0' && strchr("-+/*!~&|=<>", c) != NULL;
+    return c != '\0' && strchr(":?-+/*!~&|=<>", c) != NULL;
 }
 
 static inline bool can_be_digraph_first_character(char c) { return strchr("&|!=<>", c); }
@@ -136,6 +136,10 @@ static inline enum qxc_operator build_unigraph_operator(char c)
             return LESS_THAN_OP;
         case '~':
             return COMPLEMENT_OP;
+        case ':':
+            return COLON_OP;
+        case '?':
+            return QUESTION_MARK_OP;
         default:
             return INVALID_OP;
     }

@@ -1,5 +1,6 @@
 #include "pretty_print_ast.h"
 
+#include <assert.h>
 #include <stdio.h>
 
 static size_t indent_level;
@@ -57,30 +58,46 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             indent_level++;
             print_expression(statement->return_expr);
             indent_level--;
-            break;
-
-        case DECLARATION_STATEMENT:
-            if (statement->initializer_expr) {
-                PPRINT("Declaration<%s>:\n", statement->var_name);
-                indent_level++;
-                print_expression(statement->initializer_expr);
-                indent_level--;
-            }
-            else {
-                PPRINT("Declaration<%s>\n", statement->var_name);
-            }
-            break;
+            return;
 
         case EXPRESSION_STATEMENT:
             PPRINT("StandaloneExpr:\n");
             indent_level++;
             print_expression(statement->standalone_expr);
             indent_level--;
-            break;
+            return;
+
+        case CONDITIONAL_STATEMENT:
+            PPRINT("Conditional: UNIMPLEMENTED\n");
+            return;
 
         default:
             printf("\nunrecognized statement type! update pretty_print_ast.c!\n");
             return;
+    }
+}
+
+static void print_declaration(struct qxc_ast_declaration_node* declaration)
+{
+    PPRINT("Declaration<%s>:\n", declaration->var_name);
+    if (declaration->initializer_expr) {
+        indent_level++;
+        print_expression(declaration->initializer_expr);
+        indent_level--;
+    }
+}
+
+static void print_block_item(struct qxc_ast_block_item_node* block_item)
+{
+    if (block_item->type == STATEMENT_BLOCK_ITEM) {
+        print_statement(block_item->statement);
+    }
+    else if (block_item->type == DECLARATION_BLOCK_ITEM) {
+        print_declaration(block_item->declaration);
+    }
+    else {
+        assert(block_item->type == INVALID_BLOCK_ITEM);
+        fprintf(stderr, "invalid block item encountered");
     }
 }
 
@@ -93,10 +110,10 @@ static void print_function_decl(struct qxc_ast_function_decl_node* node)
     PPRINT("BODY:\n");
     indent_level++;
 
-    struct qxc_statement_list* s = node->slist;
-    while (s->node != NULL) {
-        print_statement(s->node);
-        s = s->next_node;
+    struct qxc_block_item_list* b = node->blist;
+    while (b->node != NULL) {
+        print_block_item(b->node);
+        b = b->next_node;
     }
     indent_level -= 2;
 }

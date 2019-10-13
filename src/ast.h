@@ -45,8 +45,8 @@ struct qxc_ast_expression_node {
 
 enum qxc_statement_type {
     RETURN_STATEMENT,
-    DECLARATION_STATEMENT,
     EXPRESSION_STATEMENT,
+    CONDITIONAL_STATEMENT,
     INVALID_STATEMENT
 };
 
@@ -56,25 +56,50 @@ struct qxc_ast_statement_node {
     union {
         struct qxc_ast_expression_node* return_expr;
 
-        struct {
-            char* var_name;
-            struct qxc_ast_expression_node* initializer_expr;
+        struct {  // if/else statement
+            struct qxc_ast_expression_node* conditional_expr;
+            struct qxc_ast_statement_node* if_branch_statement;
+            struct qxc_ast_statement_node*
+                else_branch_statement;  // optional, may be NULL
         };
 
         struct qxc_ast_expression_node* standalone_expr;
     };
 };
 
-struct qxc_statement_list {
-    struct qxc_ast_statement_node* node;
-    struct qxc_statement_list* next_node;
+// --------------------------------------------------------------------------------
+
+struct qxc_ast_declaration_node {
+    char* var_name;
+    struct qxc_ast_expression_node* initializer_expr;
+};
+
+// --------------------------------------------------------------------------------
+
+enum qxc_block_item_type {
+    STATEMENT_BLOCK_ITEM,
+    DECLARATION_BLOCK_ITEM,
+    INVALID_BLOCK_ITEM
+};
+
+struct qxc_ast_block_item_node {
+    enum qxc_block_item_type type;
+    union {
+        struct qxc_ast_statement_node* statement;
+        struct qxc_ast_declaration_node* declaration;
+    };
+};
+
+struct qxc_block_item_list {
+    struct qxc_ast_block_item_node* node;
+    struct qxc_block_item_list* next_node;
 };
 
 // --------------------------------------------------------------------------------
 
 struct qxc_ast_function_decl_node {
     const char* name;
-    struct qxc_statement_list* slist;
+    struct qxc_block_item_list* blist;
 };
 
 // --------------------------------------------------------------------------------

@@ -269,7 +269,6 @@ int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
             new_token->column = tokenizer.current_column - tokenizer.id_len;
         }
 
-        // TODO: use switch statement here
         else if (is_valid_symbol(tokenizer.next_char)) {
             qxc_consume_symbol_token(&tokenizer, token_buffer);
         }
@@ -299,6 +298,9 @@ int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
                             c1);
                     return -1;
                 }
+
+                // we don't have to advance tokenizer here, since we already consumed the
+                // next token when checking for digraph operators above
             }
         }
 

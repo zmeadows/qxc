@@ -307,31 +307,12 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             emit(gen, "syscall");
             break;
 
-        case DECLARATION_STATEMENT:
-
-            if (qxc_stack_offsets_contains(offsets, statement_node->var_name)) {
-                fprintf(stderr, "variable declared twice: %s\n",
-                        statement_node->var_name);
-                exit(EXIT_FAILURE);
-            }
-
-            if (statement_node->initializer_expr) {
-                // push initializer expression value onto stack
-                generate_expression_asm(gen, offsets, statement_node->initializer_expr);
-                emit(gen, "push rax");
-            }
-            else {
-                // push uninitialized value onto stack.
-                emit(gen, "push 0");
-            }
-
-            // associate newly pushed stack value with the corresponding new variable
-            qxc_stack_offsets_insert(offsets, statement_node->var_name);
-
-            break;
-
         case EXPRESSION_STATEMENT:
             generate_expression_asm(gen, offsets, statement_node->standalone_expr);
+            break;
+
+        case CONDITIONAL_STATEMENT:
+            fprintf(stderr, "conditional statement codegen unimplemented!");
             break;
 
         default:
@@ -339,6 +320,45 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             break;
     }
     return;
+}
+
+static void generate_declaration_asm(struct qxc_codegen* gen,
+                                     struct qxc_stack_offsets* offsets,
+                                     struct qxc_ast_declaration_node* declaration)
+{
+    if (qxc_stack_offsets_contains(offsets, declaration->var_name)) {
+        fprintf(stderr, "variable declared twice: %s\n", declaration->var_name);
+        exit(EXIT_FAILURE);
+    }
+
+    if (declaration->initializer_expr) {
+        // push initializer expression value onto stack
+        generate_expression_asm(gen, offsets, declaration->initializer_expr);
+        emit(gen, "push rax");
+    }
+    else {
+        // push uninitialized value onto stack.
+        emit(gen, "push 0");
+    }
+
+    // associate newly pushed stack value with the corresponding new variable
+    qxc_stack_offsets_insert(offsets, declaration->var_name);
+}
+
+static void generate_block_item_asm(struct qxc_codegen* gen,
+                                    struct qxc_stack_offsets* offsets,
+                                    struct qxc_ast_block_item_node* block_item)
+{
+    if (block_item->type == STATEMENT_BLOCK_ITEM) {
+        generate_statement_asm(gen, offsets, block_item->statement);
+    }
+    else if (block_item->type == DECLARATION_BLOCK_ITEM) {
+        generate_declaration_asm(gen, offsets, block_item->declaration);
+    }
+    else {
+        assert(block_item->type == INVALID_BLOCK_ITEM);
+        debug_print("invalid block item encountered in code generation");
+    }
 }
 
 // static void generate_function_asm(struct qxc_godegen* gen) {}
@@ -373,10 +393,10 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     struct qxc_stack_offsets offsets = qxc_stack_offsets_new();
 
     if (program->main_decl != NULL) {
-        struct qxc_statement_list* s = program->main_decl->slist;
-        while (s != NULL && s->node != NULL) {
-            generate_statement_asm(&gen, &offsets, s->node);
-            s = s->next_node;
+        struct qxc_block_item_list* b = program->main_decl->blist;
+        while (b != NULL && b->node != NULL) {
+            generate_block_item_asm(&gen, &offsets, b->node);
+            b = b->next_node;
         }
     }
 

@@ -1,6 +1,7 @@
 #include "pretty_print_ast.h"
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 static size_t indent_level;
@@ -8,7 +9,7 @@ static size_t indent_level;
 #define PPRINT(...)                                 \
     do {                                            \
         for (size_t i = 0; i < indent_level; i++) { \
-            printf("  ");                           \
+            printf("| ");                           \
         }                                           \
         printf(__VA_ARGS__);                        \
     } while (0)
@@ -62,19 +63,25 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             return;
 
         case CONDITIONAL_STATEMENT:
-            PPRINT("IF:\n");
+            if (statement->else_branch_statement != NULL) {
+                PPRINT("IfElseStatement:\n");
+            }
+            else {
+                PPRINT("IfStatement:\n");
+            }
             indent_level++;
 
-            PPRINT("CONDITION:\n");
+            PPRINT("Condition:\n");
             indent_level++;
             print_expression(statement->conditional_expr);
             indent_level--;
-            PPRINT("IF BRANCH:\n");
+            PPRINT("IfBranch:\n");
             indent_level++;
             print_statement(statement->if_branch_statement);
             indent_level--;
+
             if (statement->else_branch_statement != NULL) {
-                PPRINT("ELSE BRANCH:\n");
+                PPRINT("ElseBranch:\n");
                 indent_level++;
                 print_statement(statement->else_branch_statement);
                 indent_level--;

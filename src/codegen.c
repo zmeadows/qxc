@@ -340,7 +340,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             break;
 
         case CONDITIONAL_STATEMENT:
-            fprintf(stderr, "conditional statement codegen unimplemented!");
+            fprintf(stderr, "conditional statement codegen unimplemented!\n");
             break;
 
         default:

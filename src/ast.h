@@ -10,7 +10,6 @@ enum qxc_expression_type {
     INT_LITERAL_EXPR,
     UNARY_OP_EXPR,
     BINARY_OP_EXPR,
-    ASSIGNMENT_EXPR,
     VARIABLE_REFERENCE_EXPR,
     INVALID_EXPR
 };
@@ -30,11 +29,6 @@ struct qxc_ast_expression_node {
             enum qxc_operator binop;
             struct qxc_ast_expression_node* left_expr;
             struct qxc_ast_expression_node* right_expr;
-        };
-
-        struct {
-            char* assignee_var_name;
-            struct qxc_ast_expression_node* assignment_expr;
         };
 
         const char* referenced_var_name;

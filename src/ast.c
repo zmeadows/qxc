@@ -114,13 +114,13 @@ static void qxc_block_item_list_append(struct qxc_parser* parser,
     blist->next_node = alloc_empty_block_item_list(parser);
 }
 
-static void rewind_token_buffer(struct qxc_parser* parser, size_t count)
-{
-    while (count > 0 && parser->itoken > 0) {
-        parser->itoken--;
-        count--;
-    }
-}
+// static void rewind_token_buffer(struct qxc_parser* parser, size_t count)
+// {
+//     while (count > 0 && parser->itoken > 0) {
+//         parser->itoken--;
+//         count--;
+//     }
+// }
 
 static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 {
@@ -174,13 +174,15 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
     return next_token;
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser*, int);
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser*);
 
 static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parser)
 {
     struct qxc_ast_expression_node* factor = alloc_empty_expression(parser);
 
     struct qxc_token* next_token = pop_next_token(parser);
+    EXPECT_(next_token);
+
     switch (next_token->type) {
         case INTEGER_LITERAL_TOKEN:
             debug_print("parsed integer literal factor: %ld",
@@ -202,7 +204,7 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
 
         case OPEN_PAREN_TOKEN:
             debug_print("attempting to parse paren closed expression...");
-            factor = qxc_parse_expression(parser, -1);
+            factor = qxc_parse_expression(parser);
 
             EXPECT(factor, "failed to parse paren-closed expression");
 
@@ -225,75 +227,86 @@ static struct qxc_ast_expression_node* qxc_parse_factor(struct qxc_parser* parse
     return factor;
 }
 
+// TODO: clean this up and handle all errors with informative print statements
 static int binop_precedence(enum qxc_operator op)
 {
     switch (op) {
-        case LOGICAL_AND_OP:
-            return 2;
-        case LOGICAL_OR_OP:
-            return 1;
-        case MULTIPLY_OP:
-            return 6;
-        case DIVIDE_OP:
-            return 6;
-        case PLUS_OP:
-            return 5;
         case MINUS_OP:
+            return 12;
+        case PLUS_OP:
+            return 12;
+        case DIVIDE_OP:
+            return 13;
+        case MULTIPLY_OP:
+            return 13;
+        case LOGICAL_AND_OP:
             return 5;
+        case LOGICAL_OR_OP:
+            return 4;
         case EQUAL_TO_OP:
-            return 3;
+            return 9;
         case NOT_EQUAL_TO_OP:
+            return 9;
+        case COLON_OP:
+            return 3;
+        case QUESTION_MARK_OP:
             return 3;
         case LESS_THAN_OP:
-            return 4;
+            return 10;
         case LESS_THAN_OR_EQUAL_TO_OP:
-            return 4;
+            return 10;
         case GREATER_THAN_OP:
-            return 4;
+            return 10;
         case GREATER_THAN_OR_EQUAL_TO_OP:
-            return 4;
+            return 10;
+        case ASSIGNMENT_OP:
+            return 2;
+        case COMMA_OP:
+            return 1;
+        case BITWISE_OR_OP:
+            return 6;
+        case BITWISE_AND_OP:
+            return 8;
+        case BITWISE_XOR_OP:
+            return 7;
+        case BITSHIFT_LEFT_OP:
+            return 11;
+        case BITSHIFT_RIGHT_OP:
+            return 11;
+        case PERCENT_OP:
+            return 13;
+        case INVALID_OP:
+            fprintf(stderr, "invalid operator encountered");
+            return -666;
         default:
-            return -1;
+            return -999;
     }
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser,
-                                                            int min_precedence)
+static struct qxc_ast_expression_node* qxc_parse_expression_(struct qxc_parser* parser,
+                                                             int min_precedence)
 {
-    struct qxc_token* next_token = peek_next_token(parser);
-
-    if (next_token->type == IDENTIFIER_TOKEN) {
-        // encountered either a variable reference or variable assignment
-        struct qxc_token* id_token = pop_next_token(parser);
-        next_token = peek_next_token(parser);
-
-        if (next_token->type == ASSIGNMENT_TOKEN) {
-            (void)pop_next_token(parser);
-            debug_print("parsing assignment of var: %s", id_token->name);
-
-            struct qxc_ast_expression_node* assignment_expr =
-                alloc_empty_expression(parser);
-            assignment_expr->type = ASSIGNMENT_EXPR;
-            assignment_expr->assignee_var_name = id_token->name;
-            assignment_expr->assignment_expr = qxc_parse_expression(parser, -1);
-
-            EXPECT(assignment_expr->assignment_expr,
-                   "failed to parse assignment expression for variable: %s",
-                   id_token->name);
-            debug_print("successfully parsed assignment expression of variable: %s",
-                        id_token->name);
-            return assignment_expr;
-        }
-        else {
-            rewind_token_buffer(parser, 1);
-        }
-    }
-
     struct qxc_ast_expression_node* left_expr = qxc_parse_factor(parser);
     EXPECT_(left_expr);
 
-    next_token = peek_next_token(parser);
+    struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
+
+    // assignment operator is right-associative, so special treatment here
+    if (next_token->op == ASSIGNMENT_OP) {
+        EXPECT(left_expr->type == VARIABLE_REFERENCE_EXPR,
+               "left hand side of assignment operator must be a variable reference!");
+        pop_next_token(parser);
+
+        struct qxc_ast_expression_node* binop_expr = alloc_empty_expression(parser);
+        binop_expr->type = BINARY_OP_EXPR;
+        binop_expr->binop = ASSIGNMENT_OP;
+        binop_expr->left_expr = left_expr;
+        binop_expr->right_expr =
+            qxc_parse_expression_(parser, binop_precedence(ASSIGNMENT_OP));
+
+        return binop_expr;
+    }
 
     while (next_token->type == OPERATOR_TOKEN) {
         int next_op_precedence = binop_precedence(next_token->op);
@@ -304,7 +317,7 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
 
         next_token = pop_next_token(parser);
         struct qxc_ast_expression_node* right_expr =
-            qxc_parse_expression(parser, next_op_precedence);  // descend
+            qxc_parse_expression_(parser, next_op_precedence);  // descend
         EXPECT_(right_expr);
 
         struct qxc_ast_expression_node* binop_expr = alloc_empty_expression(parser);
@@ -320,6 +333,11 @@ static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* p
     }
 
     return left_expr;
+}
+
+static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser)
+{
+    return qxc_parse_expression_(parser, -1);
 }
 
 static struct qxc_ast_declaration_node* qxc_parse_declaration(struct qxc_parser* parser)
@@ -341,9 +359,11 @@ static struct qxc_ast_declaration_node* qxc_parse_declaration(struct qxc_parser*
     memcpy(new_declaration->var_name, next_token->name, id_len);
 
     next_token = peek_next_token(parser);
-    if (next_token && next_token->type == ASSIGNMENT_TOKEN) {
+
+    if (next_token && next_token->type == OPERATOR_TOKEN &&
+        next_token->op == ASSIGNMENT_OP) {
         pop_next_token(parser);  // pop off '='
-        new_declaration->initializer_expr = qxc_parse_expression(parser, 0);
+        new_declaration->initializer_expr = qxc_parse_expression(parser);
         EXPECT(new_declaration->initializer_expr, "Failed to parse variable initializer");
     }
 
@@ -362,28 +382,45 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
     if (next_token->type == KEYWORD_TOKEN && next_token->keyword == RETURN_KEYWORD) {
         pop_next_token(parser);  // pop off return keyword
         statement->type = RETURN_STATEMENT;
-        statement->return_expr = qxc_parse_expression(parser, 0);
+        statement->return_expr = qxc_parse_expression(parser);
         EXPECT(statement->return_expr, "Expression parsing failed");
+
+        EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
+               "Missing semicolon at end of statement");
     }
     else if (next_token->type == KEYWORD_TOKEN && next_token->keyword == IF_KEYWORD) {
-        fprintf(stderr, "if statement parsing unimplemented");
+        (void)pop_next_token(parser);  // pop off 'if' keyword
+        statement->type = CONDITIONAL_STATEMENT;
+        statement->conditional_expr = qxc_parse_expression(parser);
+        EXPECT_(statement->conditional_expr);
+        statement->if_branch_statement = qxc_parse_statement(parser);
+        EXPECT_(statement->if_branch_statement);
+
+        next_token = peek_next_token(parser);
+
+        if (next_token && next_token->type == KEYWORD_TOKEN &&
+            next_token->keyword == ELSE_KEYWORD) {
+            (void)pop_next_token(parser);  // pop off 'else' keyword
+            statement->else_branch_statement = qxc_parse_statement(parser);
+            EXPECT_(statement->else_branch_statement);
+        }
     }
     else {
         // fallthrough, so attempt to parse standalone expression statement
         // for now the only meaningful stand-alone expression is variable assignment
         // i.e. a = 2;
-        debug_print("attemting to parse standalone expression");
+        debug_print("attempting to parse standalone expression");
         struct qxc_ast_expression_node* standalone_expression =
-            qxc_parse_expression(parser, -1);
+            qxc_parse_expression(parser);
 
         EXPECT(standalone_expression, "Failed to parse standalone expression");
 
         statement->type = EXPRESSION_STATEMENT;
         statement->standalone_expr = standalone_expression;
-    }
 
-    EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
-           "Missing semicolon at end of statement");
+        EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
+               "Missing semicolon at end of statement");
+    }
 
     return statement;
 }

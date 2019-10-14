@@ -32,12 +32,6 @@ void print_expression(struct qxc_ast_expression_node* node)
             print_expression(node->right_expr);
             indent_level--;
             break;
-        case ASSIGNMENT_EXPR:
-            PPRINT("Assignment<%s>:\n", node->assignee_var_name);
-            indent_level++;
-            print_expression(node->assignment_expr);
-            indent_level--;
-            break;
         case VARIABLE_REFERENCE_EXPR:
             PPRINT("VariableRef<%s>\n", node->referenced_var_name);
             break;
@@ -68,7 +62,25 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             return;
 
         case CONDITIONAL_STATEMENT:
-            PPRINT("Conditional: UNIMPLEMENTED\n");
+            PPRINT("IF:\n");
+            indent_level++;
+
+            PPRINT("CONDITION:\n");
+            indent_level++;
+            print_expression(statement->conditional_expr);
+            indent_level--;
+            PPRINT("IF BRANCH:\n");
+            indent_level++;
+            print_statement(statement->if_branch_statement);
+            indent_level--;
+            if (statement->else_branch_statement != NULL) {
+                PPRINT("ELSE BRANCH:\n");
+                indent_level++;
+                print_statement(statement->else_branch_statement);
+                indent_level--;
+            }
+
+            indent_level--;
             return;
 
         default:

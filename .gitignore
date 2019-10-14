@@ -15,3 +15,5 @@ qxc
 *.o
 
 .gdb_history
+
+*valgrind-out.txt*

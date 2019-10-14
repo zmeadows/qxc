@@ -111,15 +111,165 @@ static void emit(struct qxc_codegen* gen, const char* fmt, ...)
     fprintf(gen->asm_output, "\n");
 }
 
-static bool operator_is_short_circuiting(enum qxc_operator op)
+static void generate_expression_asm(struct qxc_codegen* gen,
+                                    struct qxc_stack_offsets* offsets,
+                                    struct qxc_ast_expression_node* expr);
+
+static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
+                                                     struct qxc_stack_offsets* offsets,
+                                                     struct qxc_ast_expression_node* expr)
 {
-    switch (op) {
-        case LOGICAL_OR_OP:
-            return true;
-        case LOGICAL_AND_OP:
-            return true;
+    generate_expression_asm(gen, offsets, expr->left_expr);
+
+    emit(gen, "cmp rax, 0");
+    emit(gen, "je %s", gen->logical_or_jump_label);
+    emit(gen, "mov rax, 1");
+    emit(gen, "jmp %s", gen->logical_or_end_label);
+
+    const size_t old_indent_level = gen->indent_level;
+    gen->indent_level = 0;
+    emit(gen, "\n%s:", gen->logical_or_jump_label);
+    gen->indent_level = old_indent_level;
+
+    generate_expression_asm(gen, offsets, expr->right_expr);
+    emit(gen, "cmp rax, 0");
+    emit(gen, "mov rax, 0");
+    emit(gen, "setne al");
+
+    gen->indent_level = 0;
+    emit(gen, "\n%s:", gen->logical_or_end_label);
+    gen->indent_level = old_indent_level;
+
+    qxc_codegen_increment_logical_or_count(gen);
+}
+
+static void generate_logical_AND_binop_expression_asm(
+    struct qxc_codegen* gen, struct qxc_stack_offsets* offsets,
+    struct qxc_ast_expression_node* expr)
+{
+    generate_expression_asm(gen, offsets, expr->left_expr);
+
+    emit(gen, "cmp rax, 0");
+    emit(gen, "jne %s", gen->logical_and_jump_label);
+    emit(gen, "jmp %s", gen->logical_and_end_label);
+
+    const size_t _old_indent_level = gen->indent_level;
+    gen->indent_level = 0;
+    emit(gen, "%s:", gen->logical_and_jump_label);
+    gen->indent_level = _old_indent_level;
+
+    generate_expression_asm(gen, offsets, expr->right_expr);
+    emit(gen, "cmp rax, 0");
+    emit(gen, "mov rax, 0");
+    emit(gen, "setne al");
+
+    gen->indent_level = 0;
+    emit(gen, "%s:", gen->logical_and_end_label);
+    gen->indent_level = _old_indent_level;
+
+    qxc_codegen_increment_logical_and_count(gen);
+}
+
+static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
+                                                     struct qxc_stack_offsets* offsets,
+                                                     struct qxc_ast_expression_node* expr)
+{
+    assert(expr->left_expr && expr->right_expr);
+    assert(expr->left_expr->type == VARIABLE_REFERENCE_EXPR);
+
+    const char* varname = expr->left_expr->referenced_var_name;
+
+    // generate value to be assigned to variable in left_expr
+    generate_expression_asm(gen, offsets, expr->right_expr);
+
+    if (!qxc_stack_offsets_contains(offsets, varname)) {
+        fprintf(stderr, "attempted to assign value to un-initialized variable: %s\n",
+                varname);
+        exit(EXIT_FAILURE);
+    }
+
+    emit(gen, "mov [rbp + %d], rax", qxc_stack_offsets_lookup(offsets, varname));
+}
+
+static void generate_binop_expression_asm(struct qxc_codegen* gen,
+                                          struct qxc_stack_offsets* offsets,
+                                          struct qxc_ast_expression_node* expr)
+{
+    assert(expr->type == BINARY_OP_EXPR);
+
+    // separate treatment due to short circuiting
+    if (expr->binop == LOGICAL_OR_OP) {
+        generate_logical_OR_binop_expression_asm(gen, offsets, expr);
+        return;
+    }
+
+    // separate treatment due to short circuiting
+    if (expr->binop == LOGICAL_AND_OP) {
+        generate_logical_AND_binop_expression_asm(gen, offsets, expr);
+        return;
+    }
+
+    // separate treatment since no need to evaluate left expr
+    if (expr->binop == ASSIGNMENT_OP) {
+        generate_assignment_binop_expression_asm(gen, offsets, expr);
+        return;
+    }
+
+    // Now, all remaining binary operations behave similarly.
+
+    // Put left hand operand in rax, right hand operand in rbx
+    generate_expression_asm(gen, offsets, expr->right_expr);
+    emit(gen, "push rax");
+    generate_expression_asm(gen, offsets, expr->left_expr);
+    emit(gen, "pop rbx");
+
+    switch (expr->binop) {
+        case PLUS_OP:
+            emit(gen, "add rax, rbx");
+            break;
+        case MINUS_OP:
+            emit(gen, "sub rax, rbx");
+            break;
+        case DIVIDE_OP:
+            emit(gen, "xor rdx, rdx");
+            emit(gen, "idiv rbx");
+            break;
+        case MULTIPLY_OP:
+            emit(gen, "imul rbx");
+            break;
+        case EQUAL_TO_OP:
+            emit(gen, "cmp rax, rbx");
+            emit(gen, "mov rax, 0");
+            emit(gen, "sete al");
+            break;
+        case NOT_EQUAL_TO_OP:
+            emit(gen, "cmp rax, rbx");
+            emit(gen, "mov rax, 0");
+            emit(gen, "setne al");
+            break;
+        case LESS_THAN_OP:
+            emit(gen, "cmp rax, rbx");
+            emit(gen, "mov rax, 0");
+            emit(gen, "setl al");
+            break;
+        case LESS_THAN_OR_EQUAL_TO_OP:
+            emit(gen, "cmp rax, rbx");
+            emit(gen, "mov rax, 0");
+            emit(gen, "setle al");
+            break;
+        case GREATER_THAN_OP:
+            emit(gen, "cmp rax, rbx");
+            emit(gen, "mov rax, 0");
+            emit(gen, "setg al");
+            break;
+        case GREATER_THAN_OR_EQUAL_TO_OP:
+            emit(gen, "cmp rax, rbx");
+            emit(gen, "mov rax, 0");
+            emit(gen, "setge al");
+            break;
         default:
-            return false;
+            fprintf(stderr, "fallthrough to unsupported binary operation!");
+            break;
     }
 }
 
@@ -154,130 +304,8 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             return;
 
         case BINARY_OP_EXPR:
-            if (operator_is_short_circuiting(expr->binop)) {
-                generate_expression_asm(gen, offsets, expr->left_expr);
-
-                switch (expr->binop) {
-                    case LOGICAL_OR_OP:
-                        emit(gen, "cmp rax, 0");
-                        emit(gen, "je %s", gen->logical_or_jump_label);
-                        emit(gen, "mov rax, 1");
-                        emit(gen, "jmp %s", gen->logical_or_end_label);
-
-                        const size_t old_indent_level = gen->indent_level;
-                        gen->indent_level = 0;
-                        emit(gen, "\n%s:", gen->logical_or_jump_label);
-                        gen->indent_level = old_indent_level;
-
-                        generate_expression_asm(gen, offsets, expr->right_expr);
-                        emit(gen, "cmp rax, 0");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setne al");
-
-                        gen->indent_level = 0;
-                        emit(gen, "\n%s:", gen->logical_or_end_label);
-                        gen->indent_level = old_indent_level;
-
-                        qxc_codegen_increment_logical_or_count(gen);
-                        break;
-
-                    case LOGICAL_AND_OP:
-                        emit(gen, "cmp rax, 0");
-                        emit(gen, "jne %s", gen->logical_and_jump_label);
-                        emit(gen, "jmp %s", gen->logical_and_end_label);
-
-                        const size_t _old_indent_level = gen->indent_level;
-                        gen->indent_level = 0;
-                        emit(gen, "%s:", gen->logical_and_jump_label);
-                        gen->indent_level = _old_indent_level;
-
-                        generate_expression_asm(gen, offsets, expr->right_expr);
-                        emit(gen, "cmp rax, 0");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setne al");
-
-                        gen->indent_level = 0;
-                        emit(gen, "%s:", gen->logical_and_end_label);
-                        gen->indent_level = _old_indent_level;
-
-                        qxc_codegen_increment_logical_and_count(gen);
-                        break;
-                    default:
-                        break;
-                        // TODO: error handling
-                }
-            }
-            else {
-                // put left hand operand in rax, right hand operand in rbx
-                generate_expression_asm(gen, offsets, expr->right_expr);
-                emit(gen, "push rax");
-                generate_expression_asm(gen, offsets, expr->left_expr);
-                emit(gen, "pop rbx");
-
-                switch (expr->binop) {
-                    case PLUS_OP:
-                        emit(gen, "add rax, rbx");
-                        break;
-                    case MINUS_OP:
-                        emit(gen, "sub rax, rbx");
-                        break;
-                    case DIVIDE_OP:
-                        emit(gen, "xor rdx, rdx");
-                        emit(gen, "idiv rbx");
-                        break;
-                    case MULTIPLY_OP:
-                        emit(gen, "imul rbx");
-                        break;
-                    case EQUAL_TO_OP:
-                        emit(gen, "cmp rax, rbx");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "sete al");
-                        break;
-                    case NOT_EQUAL_TO_OP:
-                        emit(gen, "cmp rax, rbx");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setne al");
-                        break;
-                    case LESS_THAN_OP:
-                        emit(gen, "cmp rax, rbx");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setl al");
-                        break;
-                    case LESS_THAN_OR_EQUAL_TO_OP:
-                        emit(gen, "cmp rax, rbx");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setle al");
-                        break;
-                    case GREATER_THAN_OP:
-                        emit(gen, "cmp rax, rbx");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setg al");
-                        break;
-                    case GREATER_THAN_OR_EQUAL_TO_OP:
-                        emit(gen, "cmp rax, rbx");
-                        emit(gen, "mov rax, 0");
-                        emit(gen, "setge al");
-                        break;
-                    default:
-                        // TODO: error handling
-                        break;
-                }
-            }
-
+            generate_binop_expression_asm(gen, offsets, expr);
             return;
-
-        case ASSIGNMENT_EXPR:
-            generate_expression_asm(gen, offsets, expr->assignment_expr);
-
-            if (!qxc_stack_offsets_contains(offsets, expr->assignee_var_name)) {
-                fprintf(stderr, "assigning to un-initialized variable: %s\n",
-                        expr->assignee_var_name);
-                exit(EXIT_FAILURE);
-            }
-
-            emit(gen, "mov [rbp + %d], rax",
-                 qxc_stack_offsets_lookup(offsets, expr->assignee_var_name));
-            break;
 
         case VARIABLE_REFERENCE_EXPR:
             if (!qxc_stack_offsets_contains(offsets, expr->referenced_var_name)) {
@@ -287,7 +315,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             }
             emit(gen, "mov rax, [rbp + %d]",
                  qxc_stack_offsets_lookup(offsets, expr->referenced_var_name));
-            break;
+            return;
 
         default:
             // TODO: error handling

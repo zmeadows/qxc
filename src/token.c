@@ -79,6 +79,8 @@ const char* qxc_operator_to_str(enum qxc_operator op)
             return ":";
         case QUESTION_MARK_OP:
             return "?";
+        case ASSIGNMENT_OP:
+            return "=";
         default:
             return NULL;
     }
@@ -131,9 +133,6 @@ void qxc_token_print(struct qxc_token* token)
             break;
         case SEMICOLON_TOKEN:
             printf(";");
-            break;
-        case ASSIGNMENT_TOKEN:
-            printf("=");
             break;
         case KEYWORD_TOKEN:
             printf("keyword: %s", qxc_keyword_to_str(token->keyword));

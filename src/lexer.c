@@ -140,6 +140,8 @@ static inline enum qxc_operator build_unigraph_operator(char c)
             return COLON_OP;
         case '?':
             return QUESTION_MARK_OP;
+        case '=':
+            return ASSIGNMENT_OP;
         default:
             return INVALID_OP;
     }
@@ -197,9 +199,6 @@ static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
             break;
         case ';':
             new_token->type = SEMICOLON_TOKEN;
-            break;
-        case '=':
-            new_token->type = ASSIGNMENT_TOKEN;
             break;
         default:
             new_token->type = INVALID_TOKEN;

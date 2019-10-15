@@ -62,6 +62,7 @@ void print_file(const char* filepath)
 
     if (fptr == NULL) {
         fprintf(stderr, "Cannot open file \n");
+        return;
     }
 
     // Read contents from file

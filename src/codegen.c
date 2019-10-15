@@ -72,6 +72,7 @@ struct qxc_codegen {
     FILE* asm_output;
     size_t indent_level;
 
+    // TODO: abstract out to qxc_jump_label struct
     size_t logical_or_counter;
     char logical_or_jump_label[256];
     char logical_or_end_label[256];
@@ -209,7 +210,7 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
         return;
     }
 
-    // separate treatment since no need to evaluate left expr
+    // separate treatment to avoid evaluating left expr
     if (expr->binop == ASSIGNMENT_OP) {
         generate_assignment_binop_expression_asm(gen, offsets, expr);
         return;
@@ -435,4 +436,6 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     gen.indent_level--;
 
     fclose(gen.asm_output);
+
+    qxc_memory_pool_release(program->ast_memory_pool);
 }

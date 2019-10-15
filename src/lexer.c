@@ -1,3 +1,5 @@
+#include "lexer.h"
+
 #include <errno.h>
 #include <math.h>
 #include <stdbool.h>
@@ -6,7 +8,6 @@
 #include <string.h>
 
 #include "allocator.h"
-#include "lexer.h"
 #include "prelude.h"
 #include "token.h"
 
@@ -59,6 +60,11 @@ static int qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* filep
     tokenizer->next_char = *tokenizer->next_char_ptr;
 
     return 0;
+}
+
+static void qxc_tokenizer_free(struct qxc_tokenizer* tokenizer)
+{
+    free(tokenizer->contents);
 }
 
 static void qxc_tokenizer_advance(struct qxc_tokenizer* tokenizer)
@@ -342,6 +348,8 @@ int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
             break;
         }
     }
+
+    qxc_tokenizer_free(&tokenizer);
 
     return 0;
 }

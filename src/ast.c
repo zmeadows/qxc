@@ -307,6 +307,8 @@ static bool binop_valid_for_logical_or_expr_or_below(enum qxc_operator op)
     return binop_precedence(op) > 3;
 }
 
+// remember, if things get wonky you can re-write the parser explicitely for each
+// definition
 static struct qxc_ast_expression_node* qxc_parse_logical_or_expr_(
     struct qxc_parser* parser, struct qxc_ast_expression_node* left_factor,
     int min_precedence)
@@ -352,6 +354,9 @@ static struct qxc_ast_expression_node* qxc_parse_logical_or_expr(
 static struct qxc_ast_expression_node* qxc_parse_conditional_expression(
     struct qxc_parser* parser, struct qxc_ast_expression_node* left_factor)
 {
+    struct qxc_ast_expression_node* lor_expr =
+        qxc_parse_logical_or_expr(parser, left_factor);
+
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
@@ -360,7 +365,7 @@ static struct qxc_ast_expression_node* qxc_parse_conditional_expression(
 
         struct qxc_ast_expression_node* ternary_expr = alloc_empty_expression(parser);
         ternary_expr->type = CONDITIONAL_EXPR;
-        ternary_expr->conditional_expr = left_factor;
+        ternary_expr->conditional_expr = lor_expr;
         ternary_expr->if_expr = qxc_parse_expression(parser);
         (void)pop_next_token(parser);
         ternary_expr->else_expr =
@@ -369,8 +374,7 @@ static struct qxc_ast_expression_node* qxc_parse_conditional_expression(
         return ternary_expr;
     }
     else {
-        // the remaining grammar rules are all just binary operation expressions
-        return qxc_parse_logical_or_expr(parser, left_factor);
+        return lor_expr;
     }
 }
 

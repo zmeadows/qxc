@@ -1,6 +1,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "prelude.h"
+#include "pretty_print_ast.h"
 #include "token.h"
 
 #include <assert.h>
@@ -8,11 +9,15 @@
 #include <string.h>
 
 // <program> ::= <function>
-// <function> ::= "int" <id> "(" ")" "{" { <statement> } "}"
+// <function> ::= "int" <id> "(" ")" "{" { <block-item> } "}"
+// <block-item> ::= <statement> | <declaration>
+// <declaration> ::= "int" <id> [ = <exp> ] ";"
 // <statement> ::= "return" <exp> ";"
 //               | <exp> ";"
-//               | "int" <id> [ = <exp>] ";"
-// <exp> ::= <id> "=" <exp> | <logical-or-exp>
+//               | "if" "(" <exp> ")" <statement> [ "else" <statement> ]
+//
+// <exp> ::= <id> "=" <exp> | <conditional-exp>
+// <conditional-exp> ::= <logical-or-exp> [ "?" <exp> ":" <conditional-exp> ]
 // <logical-or-exp> ::= <logical-and-exp> { "||" <logical-and-exp> }
 // <logical-and-exp> ::= <equality-exp> { "&&" <equality-exp> }
 // <equality-exp> ::= <relational-exp> { ("!=" | "==") <relational-exp> }
@@ -77,6 +82,8 @@ static inline struct qxc_ast_declaration_node* alloc_empty_declaration_node(
 {
     struct qxc_ast_declaration_node* decl =
         qxc_malloc(parser->ast_memory_pool, sizeof(struct qxc_ast_declaration_node));
+    decl->var_name = NULL;
+    decl->initializer_expr = NULL;
     return decl;
 }
 
@@ -173,6 +180,18 @@ static struct qxc_token* qxc_parser_expect_identifier(struct qxc_parser* parser,
 
     return next_token;
 }
+
+// static struct qxc_token* qxc_parser_expect_operator(struct qxc_parser* parser,
+//                                                     enum qxc_operator expected_op)
+// {
+//     struct qxc_token* next_token = pop_next_token(parser);
+//
+//     EXPECT(
+//         next_token && next_token->type == OPERATOR_TOKEN && next_token->op ==
+//         expected_op, "Expected operator");
+//
+//     return next_token;
+// }
 
 static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser*);
 
@@ -283,61 +302,103 @@ static int binop_precedence(enum qxc_operator op)
     }
 }
 
-static struct qxc_ast_expression_node* qxc_parse_expression_(struct qxc_parser* parser,
-                                                             int min_precedence)
+static bool binop_valid_for_logical_or_expr_or_below(enum qxc_operator op)
 {
-    struct qxc_ast_expression_node* left_expr = qxc_parse_factor(parser);
-    EXPECT_(left_expr);
+    return binop_precedence(op) > 3;
+}
 
+static struct qxc_ast_expression_node* qxc_parse_logical_or_expr_(
+    struct qxc_parser* parser, struct qxc_ast_expression_node* left_factor,
+    int min_precedence)
+{
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
-    // assignment operator is right-associative, so special treatment here
-    if (next_token->op == ASSIGNMENT_OP) {
-        EXPECT(left_expr->type == VARIABLE_REFERENCE_EXPR,
-               "left hand side of assignment operator must be a variable reference!");
-        pop_next_token(parser);
-
-        struct qxc_ast_expression_node* binop_expr = alloc_empty_expression(parser);
-        binop_expr->type = BINARY_OP_EXPR;
-        binop_expr->binop = ASSIGNMENT_OP;
-        binop_expr->left_expr = left_expr;
-        binop_expr->right_expr =
-            qxc_parse_expression_(parser, binop_precedence(ASSIGNMENT_OP));
-
-        return binop_expr;
-    }
-
-    while (next_token->type == OPERATOR_TOKEN) {
-        int next_op_precedence = binop_precedence(next_token->op);
+    while (next_token->type == OPERATOR_TOKEN &&
+           binop_valid_for_logical_or_expr_or_below(next_token->op)) {
+        EXPECT(next_token->op != ASSIGNMENT_OP, "assignment operator in invalid place!");
+        const int next_op_precedence = binop_precedence(next_token->op);
 
         if (next_op_precedence <= min_precedence) {
             break;
         }
 
         next_token = pop_next_token(parser);
-        struct qxc_ast_expression_node* right_expr =
-            qxc_parse_expression_(parser, next_op_precedence);  // descend
+        struct qxc_ast_expression_node* right_expr = qxc_parse_logical_or_expr_(
+            parser, qxc_parse_factor(parser), next_op_precedence);
         EXPECT_(right_expr);
 
         struct qxc_ast_expression_node* binop_expr = alloc_empty_expression(parser);
         binop_expr->type = BINARY_OP_EXPR;
         binop_expr->binop = next_token->op;
-        binop_expr->left_expr = left_expr;
+        binop_expr->left_expr = left_factor;
         binop_expr->right_expr = right_expr;
 
-        left_expr = binop_expr;
+        left_factor = binop_expr;
 
         next_token = peek_next_token(parser);
         EXPECT_(next_token);
     }
 
-    return left_expr;
+    return left_factor;
+}
+
+static struct qxc_ast_expression_node* qxc_parse_logical_or_expr(
+    struct qxc_parser* parser, struct qxc_ast_expression_node* left_factor)
+{
+    return qxc_parse_logical_or_expr_(parser, left_factor, -1);
+}
+
+static struct qxc_ast_expression_node* qxc_parse_conditional_expression(
+    struct qxc_parser* parser, struct qxc_ast_expression_node* left_factor)
+{
+    struct qxc_token* next_token = peek_next_token(parser);
+    EXPECT_(next_token);
+
+    if (next_token->op == QUESTION_MARK_OP) {
+        (void)pop_next_token(parser);
+
+        struct qxc_ast_expression_node* ternary_expr = alloc_empty_expression(parser);
+        ternary_expr->type = CONDITIONAL_EXPR;
+        ternary_expr->conditional_expr = left_factor;
+        ternary_expr->if_expr = qxc_parse_expression(parser);
+        (void)pop_next_token(parser);
+        ternary_expr->else_expr =
+            qxc_parse_conditional_expression(parser, qxc_parse_factor(parser));
+
+        return ternary_expr;
+    }
+    else {
+        // the remaining grammar rules are all just binary operation expressions
+        return qxc_parse_logical_or_expr(parser, left_factor);
+    }
 }
 
 static struct qxc_ast_expression_node* qxc_parse_expression(struct qxc_parser* parser)
 {
-    return qxc_parse_expression_(parser, -1);
+    struct qxc_ast_expression_node* left_factor = qxc_parse_factor(parser);
+    EXPECT_(left_factor);
+
+    struct qxc_token* next_token = peek_next_token(parser);
+    EXPECT_(next_token);
+
+    // assignment operator is right-associative, so special treatment here
+    if (next_token->op == ASSIGNMENT_OP) {
+        EXPECT(left_factor->type == VARIABLE_REFERENCE_EXPR,
+               "left hand side of assignment operator must be a variable reference!");
+        (void)pop_next_token(parser);
+
+        struct qxc_ast_expression_node* binop_expr = alloc_empty_expression(parser);
+        binop_expr->type = BINARY_OP_EXPR;
+        binop_expr->binop = ASSIGNMENT_OP;
+        binop_expr->left_expr = left_factor;
+        binop_expr->right_expr = qxc_parse_expression(parser);
+
+        return binop_expr;
+    }
+    else {
+        return qxc_parse_conditional_expression(parser, left_factor);
+    }
 }
 
 static struct qxc_ast_declaration_node* qxc_parse_declaration(struct qxc_parser* parser)

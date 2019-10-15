@@ -11,6 +11,7 @@ enum qxc_expression_type {
     UNARY_OP_EXPR,
     BINARY_OP_EXPR,
     VARIABLE_REFERENCE_EXPR,
+    CONDITIONAL_EXPR,
     INVALID_EXPR
 };
 
@@ -29,6 +30,12 @@ struct qxc_ast_expression_node {
             enum qxc_operator binop;
             struct qxc_ast_expression_node* left_expr;
             struct qxc_ast_expression_node* right_expr;
+        };
+
+        struct {
+            struct qxc_ast_expression_node* conditional_expr;
+            struct qxc_ast_expression_node* if_expr;
+            struct qxc_ast_expression_node* else_expr;
         };
 
         const char* referenced_var_name;

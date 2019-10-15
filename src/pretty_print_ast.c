@@ -20,12 +20,14 @@ void print_expression(struct qxc_ast_expression_node* node)
         case INT_LITERAL_EXPR:
             PPRINT("Int<%ld>\n", node->literal);
             break;
+
         case UNARY_OP_EXPR:
             PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop));
             indent_level++;
             print_expression(node->unary_expr);
             indent_level--;
             break;
+
         case BINARY_OP_EXPR:
             PPRINT("BinaryOp<%s>:\n", qxc_operator_to_str(node->binop));
             indent_level++;
@@ -33,12 +35,33 @@ void print_expression(struct qxc_ast_expression_node* node)
             print_expression(node->right_expr);
             indent_level--;
             break;
+
         case VARIABLE_REFERENCE_EXPR:
             PPRINT("VariableRef<%s>\n", node->referenced_var_name);
             break;
+
+        case CONDITIONAL_EXPR:
+            PPRINT("TernaryConditional\n");
+            indent_level++;
+            PPRINT("Condition:\n");
+            indent_level++;
+            print_expression(node->conditional_expr);
+            indent_level--;
+            PPRINT("IfExpr:\n");
+            indent_level++;
+            print_expression(node->if_expr);
+            indent_level--;
+            PPRINT("ElseExpr:\n");
+            indent_level++;
+            print_expression(node->else_expr);
+            indent_level--;
+            indent_level--;
+            break;
+
         case INVALID_EXPR:
             PPRINT("InvalidExpr");
             break;
+
         default:
             printf("\nunrecognized expression type\n");
             return;

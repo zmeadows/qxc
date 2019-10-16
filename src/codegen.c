@@ -68,18 +68,23 @@ static int qxc_stack_offsets_lookup(struct qxc_stack_offsets* offsets, const cha
 //     offsets->count = 0;
 // }
 
+#define LABEL_COUNTER_NAME_MAX_SIZE 256
 struct qxc_codegen {
     FILE* asm_output;
     size_t indent_level;
 
     // TODO: abstract out to qxc_jump_label struct
     size_t logical_or_counter;
-    char logical_or_jump_label[256];
-    char logical_or_end_label[256];
+    char logical_or_jump_label[LABEL_COUNTER_NAME_MAX_SIZE];
+    char logical_or_end_label[LABEL_COUNTER_NAME_MAX_SIZE];
 
     size_t logical_and_counter;
-    char logical_and_jump_label[256];
-    char logical_and_end_label[256];
+    char logical_and_jump_label[LABEL_COUNTER_NAME_MAX_SIZE];
+    char logical_and_end_label[LABEL_COUNTER_NAME_MAX_SIZE];
+
+    size_t conditional_expr_counter;
+    char conditional_expr_else_label[LABEL_COUNTER_NAME_MAX_SIZE];
+    char conditional_expr_post_label[LABEL_COUNTER_NAME_MAX_SIZE];
 };
 
 static void qxc_codegen_increment_logical_or_count(struct qxc_codegen* gen)
@@ -98,6 +103,16 @@ static void qxc_codegen_increment_logical_and_count(struct qxc_codegen* gen)
     sprintf(gen->logical_and_jump_label, "_LogicalAnd_SndClause_%zu",
             gen->logical_and_counter);
     sprintf(gen->logical_and_end_label, "_LogicalAnd_End_%zu", gen->logical_and_counter);
+}
+
+static void qxc_codegen_increment_conditional_expr_count(struct qxc_codegen* gen)
+{
+    // TODO: overflow protection
+    gen->conditional_expr_counter++;
+    sprintf(gen->conditional_expr_else_label, "_CondExpr_ElseClause_%zu",
+            gen->conditional_expr_counter);
+    sprintf(gen->conditional_expr_post_label, "_CondExpr_PostClause_%zu",
+            gen->conditional_expr_counter);
 }
 
 static void emit(struct qxc_codegen* gen, const char* fmt, ...)
@@ -308,6 +323,21 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             generate_binop_expression_asm(gen, offsets, expr);
             return;
 
+        case CONDITIONAL_EXPR:
+            generate_expression_asm(gen, offsets, expr->conditional_expr);
+            // conditional expr result is now in rax
+            emit(gen, "cmp rax, 0");
+            emit(gen, "je %s", gen->conditional_expr_else_label);
+            generate_expression_asm(gen, offsets, expr->if_expr);
+            emit(gen, "jmp %s", gen->conditional_expr_post_label);
+            // if_expr result is now in rax
+            emit(gen, "\n%s:", gen->conditional_expr_else_label);
+            generate_expression_asm(gen, offsets, expr->else_expr);
+            emit(gen, "\n%s:", gen->conditional_expr_post_label);
+            // else expr result is now in rax
+            qxc_codegen_increment_conditional_expr_count(gen);
+            return;
+
         case VARIABLE_REFERENCE_EXPR:
             if (!qxc_stack_offsets_contains(offsets, expr->referenced_var_name)) {
                 fprintf(stderr, "referenced unknown variable: %s\n",
@@ -341,7 +371,31 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             break;
 
         case CONDITIONAL_STATEMENT:
-            fprintf(stderr, "conditional statement codegen unimplemented!\n");
+            if (statement_node->else_branch_statement != NULL) {
+                generate_expression_asm(gen, offsets, statement_node->conditional_expr);
+                // conditional expr result is now in rax
+                emit(gen, "cmp rax, 0");
+                emit(gen, "je %s", gen->conditional_expr_else_label);
+                generate_statement_asm(gen, offsets, statement_node->if_branch_statement);
+                emit(gen, "jmp %s", gen->conditional_expr_post_label);
+                // if_expr result is now in rax
+                emit(gen, "\n%s:", gen->conditional_expr_else_label);
+                generate_statement_asm(gen, offsets,
+                                       statement_node->else_branch_statement);
+                emit(gen, "\n%s:", gen->conditional_expr_post_label);
+                // else expr result is now in rax
+                qxc_codegen_increment_conditional_expr_count(gen);
+            }
+            else {
+                generate_expression_asm(gen, offsets, statement_node->conditional_expr);
+                // conditional expr result is now in rax
+                emit(gen, "cmp rax, 0");
+                emit(gen, "je %s", gen->conditional_expr_post_label);
+                generate_statement_asm(gen, offsets, statement_node->if_branch_statement);
+                emit(gen, "\n%s:", gen->conditional_expr_post_label);
+                // else expr result is now in rax
+                qxc_codegen_increment_conditional_expr_count(gen);
+            }
             break;
 
         default:
@@ -405,6 +459,10 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     sprintf(gen.logical_and_jump_label, "_LogicalAnd_SndClause_0");
     sprintf(gen.logical_and_end_label, "_LogicalAnd_End_0");
 
+    gen.conditional_expr_counter = 0;
+    sprintf(gen.conditional_expr_else_label, "_CondExpr_IfClause_0");
+    sprintf(gen.conditional_expr_post_label, "_CondExpr_PostClause_0");
+
     gen.asm_output = fopen(output_filepath, "w");
 
     gen.indent_level++;
@@ -439,3 +497,4 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
 
     qxc_memory_pool_release(program->ast_memory_pool);
 }
+

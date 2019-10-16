@@ -48,6 +48,7 @@ enum qxc_statement_type {
     RETURN_STATEMENT,
     EXPRESSION_STATEMENT,
     CONDITIONAL_STATEMENT,
+    COMPOUND_STATEMENT,
     INVALID_STATEMENT
 };
 
@@ -63,6 +64,8 @@ struct qxc_ast_statement_node {
             struct qxc_ast_statement_node*
                 else_branch_statement;  // optional, may be NULL
         };
+
+        struct qxc_block_item_list* compound_statement_block_items;
 
         struct qxc_ast_expression_node* standalone_expr;
     };

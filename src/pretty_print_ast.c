@@ -68,6 +68,8 @@ void print_expression(struct qxc_ast_expression_node* node)
     }
 }
 
+static void print_block_item(struct qxc_ast_block_item_node* block_item);
+
 static void print_statement(struct qxc_ast_statement_node* statement)
 {
     switch (statement->type) {
@@ -108,6 +110,19 @@ static void print_statement(struct qxc_ast_statement_node* statement)
                 indent_level++;
                 print_statement(statement->else_branch_statement);
                 indent_level--;
+            }
+
+            indent_level--;
+            return;
+
+        case COMPOUND_STATEMENT:
+            PPRINT("CompoundStatement:\n");
+            indent_level++;
+
+            struct qxc_block_item_list* b = statement->compound_statement_block_items;
+            while (b->node != NULL) {
+                print_block_item(b->node);
+                b = b->next_node;
             }
 
             indent_level--;

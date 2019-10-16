@@ -438,6 +438,8 @@ static struct qxc_ast_declaration_node* qxc_parse_declaration(struct qxc_parser*
     return new_declaration;
 }
 
+static struct qxc_ast_block_item_node* qxc_parse_block_item(struct qxc_parser* parser);
+
 static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* parser)
 {
     struct qxc_token* next_token = peek_next_token(parser);
@@ -469,6 +471,24 @@ static struct qxc_ast_statement_node* qxc_parse_statement(struct qxc_parser* par
             statement->else_branch_statement = qxc_parse_statement(parser);
             EXPECT_(statement->else_branch_statement);
         }
+    }
+    else if (next_token->type == OPEN_BRACE_TOKEN) {
+        (void)pop_next_token(parser);  // pop off 'if' keyword
+        statement->type = COMPOUND_STATEMENT;
+
+        // TODO: abstract out to parse_block_item_list
+        statement->compound_statement_block_items = alloc_empty_block_item_list(parser);
+        while (peek_next_token(parser)->type != CLOSE_BRACE_TOKEN) {
+            struct qxc_ast_block_item_node* next_block_item =
+                qxc_parse_block_item(parser);
+            EXPECT(next_block_item, "Failed to parse block item in function: main");
+            qxc_block_item_list_append(parser, statement->compound_statement_block_items,
+                                       next_block_item);
+            debug_print("successfully parsed block item");
+        }
+
+        EXPECT(qxc_parser_expect_token_type(parser, CLOSE_BRACE_TOKEN),
+               "Missing closing brace at end of compound statement");
     }
     else {
         // fallthrough, so attempt to parse standalone expression statement

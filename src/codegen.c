@@ -130,8 +130,7 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
                                                      struct qxc_ast_expression_node* expr)
 {
-    struct qxc_jump_label snd_label;
-    struct qxc_jump_label end_label;
+    struct qxc_jump_label snd_label, end_label;
     build_logical_or_jump_labels(gen, &snd_label, &end_label);
 
     generate_expression_asm(gen, offsets, expr->left_expr);
@@ -155,8 +154,7 @@ static void generate_logical_AND_binop_expression_asm(
     struct qxc_codegen* gen, struct qxc_stack_offsets* offsets,
     struct qxc_ast_expression_node* expr)
 {
-    struct qxc_jump_label snd_label;
-    struct qxc_jump_label end_label;
+    struct qxc_jump_label snd_label, end_label;
     build_logical_and_jump_labels(gen, &snd_label, &end_label);
 
     generate_expression_asm(gen, offsets, expr->left_expr);
@@ -273,7 +271,7 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
             emit(gen, "setge al");
             break;
         default:
-            fprintf(stderr, "fallthrough to unsupported binary operation!");
+            QXC_UNREACHABLE();
             break;
     }
 }
@@ -303,6 +301,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
                     emit(gen, "sete al");
                     break;
                 default:
+                    QXC_UNREACHABLE();
                     break;
             }
 
@@ -313,8 +312,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             return;
 
         case CONDITIONAL_EXPR: {
-            struct qxc_jump_label else_label;
-            struct qxc_jump_label post_label;
+            struct qxc_jump_label else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
             generate_expression_asm(gen, offsets, expr->conditional_expr);
@@ -339,7 +337,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             return;
 
         default:
-            // TODO: error handling
+            QXC_UNREACHABLE();
             return;
     }
 }
@@ -361,8 +359,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             break;
 
         case CONDITIONAL_STATEMENT: {
-            struct qxc_jump_label else_label;
-            struct qxc_jump_label post_label;
+            struct qxc_jump_label else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
             if (statement_node->else_branch_statement != NULL) {
@@ -387,7 +384,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
         }
 
         default:
-            // printf("\nunrecognized statement type\n");
+            QXC_UNREACHABLE();
             break;
     }
     return;

@@ -1,12 +1,13 @@
 #include "ast.h"
-#include "lexer.h"
-#include "prelude.h"
-#include "pretty_print_ast.h"
-#include "token.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "lexer.h"
+#include "prelude.h"
+#include "pretty_print_ast.h"
+#include "token.h"
 
 // <program> ::= <function>
 // <function> ::= "int" <id> "(" ")" "{" { <block-item> } "}"
@@ -295,10 +296,9 @@ static int binop_precedence(enum qxc_operator op)
         case PERCENT_OP:
             return 13;
         case INVALID_OP:
-            fprintf(stderr, "invalid operator encountered");
-            return -666;
-        default:
             return -999;
+        default:
+            QXC_UNREACHABLE();
     }
 }
 

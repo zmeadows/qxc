@@ -25,6 +25,8 @@
     fprintf(stderr, "fatal compiler error:\n%s\n", msg);           \
     exit(EXIT_FAILURE);
 
+#define QXC_UNREACHABLE() QXC_FATAL_ERROR("Supposedly unreachable path encountered")
+
 #define qxc_snprintf(buf, buf_size, ...)                     \
     if (snprintf(buf, buf_size, __VA_ARGS__) > buf_size) {   \
         QXC_FATAL_ERROR("Buffer overflow in string buffer"); \

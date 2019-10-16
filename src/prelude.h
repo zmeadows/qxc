@@ -20,6 +20,16 @@
     } while (0)
 #endif
 
+#define QXC_FATAL_ERROR(msg)                                       \
+    fprintf(stderr, "%s:%d:%s(): ", __FILE__, __LINE__, __func__); \
+    fprintf(stderr, "fatal compiler error:\n%s\n", msg);           \
+    exit(EXIT_FAILURE);
+
+#define qxc_snprintf(buf, buf_size, ...)                     \
+    if (snprintf(buf, buf_size, __VA_ARGS__) > buf_size) {   \
+        QXC_FATAL_ERROR("Buffer overflow in string buffer"); \
+    }
+
 bool strs_are_equal(const char* strA, const char* strB);
 
 void strip_ext(char* fname);
@@ -30,6 +40,8 @@ void rm_tmp_dir(const char* tmp_path);
 size_t max(size_t a, size_t b);
 
 void print_file(const char* filepath);
+
+void qxc_compiler_error_halt(const char* msg);
 
 // struct qxc_small_str {
 //     char storage[16];

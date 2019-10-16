@@ -73,46 +73,41 @@ struct qxc_codegen {
     FILE* asm_output;
     size_t indent_level;
 
-    // TODO: abstract out to qxc_jump_label struct
     size_t logical_or_counter;
-    char logical_or_jump_label[LABEL_COUNTER_NAME_MAX_SIZE];
-    char logical_or_end_label[LABEL_COUNTER_NAME_MAX_SIZE];
-
     size_t logical_and_counter;
-    char logical_and_jump_label[LABEL_COUNTER_NAME_MAX_SIZE];
-    char logical_and_end_label[LABEL_COUNTER_NAME_MAX_SIZE];
-
     size_t conditional_expr_counter;
-    char conditional_expr_else_label[LABEL_COUNTER_NAME_MAX_SIZE];
-    char conditional_expr_post_label[LABEL_COUNTER_NAME_MAX_SIZE];
 };
 
-static void qxc_codegen_increment_logical_or_count(struct qxc_codegen* gen)
+#define JUMP_LABEL_MAX_LENGTH 64
+struct qxc_jump_label {
+    char buffer[JUMP_LABEL_MAX_LENGTH];
+};
+
+static void build_logical_or_jump_labels(struct qxc_codegen* gen,
+                                         struct qxc_jump_label* snd_label,
+                                         struct qxc_jump_label* end_label)
 {
-    // TODO: overflow protection
-    gen->logical_or_counter++;
-    sprintf(gen->logical_or_jump_label, "_LogicalOr_SndClause_%zu",
-            gen->logical_or_counter);
-    sprintf(gen->logical_or_end_label, "_LogicalOr_End_%zu", gen->logical_or_counter);
+    size_t count = ++gen->logical_or_counter;
+    qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu", count);
+    qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu", count);
 }
 
-static void qxc_codegen_increment_logical_and_count(struct qxc_codegen* gen)
+static void build_logical_and_jump_labels(struct qxc_codegen* gen,
+                                          struct qxc_jump_label* snd_label,
+                                          struct qxc_jump_label* end_label)
 {
-    // TODO: overflow protection
-    gen->logical_and_counter++;
-    sprintf(gen->logical_and_jump_label, "_LogicalAnd_SndClause_%zu",
-            gen->logical_and_counter);
-    sprintf(gen->logical_and_end_label, "_LogicalAnd_End_%zu", gen->logical_and_counter);
+    size_t count = ++gen->logical_and_counter;
+    qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LAND_Snd_%zu", count);
+    qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LAND_End_%zu", count);
 }
 
-static void qxc_codegen_increment_conditional_expr_count(struct qxc_codegen* gen)
+static void build_conditional_expr_jump_labels(struct qxc_codegen* gen,
+                                               struct qxc_jump_label* else_label,
+                                               struct qxc_jump_label* post_label)
 {
-    // TODO: overflow protection
-    gen->conditional_expr_counter++;
-    sprintf(gen->conditional_expr_else_label, "_CondExpr_ElseClause_%zu",
-            gen->conditional_expr_counter);
-    sprintf(gen->conditional_expr_post_label, "_CondExpr_PostClause_%zu",
-            gen->conditional_expr_counter);
+    size_t count = ++gen->conditional_expr_counter;
+    qxc_snprintf(else_label->buffer, JUMP_LABEL_MAX_LENGTH, "_CondExpr_Else_%zu", count);
+    qxc_snprintf(post_label->buffer, JUMP_LABEL_MAX_LENGTH, "_CondExpr_Post_%zu", count);
 }
 
 static void emit(struct qxc_codegen* gen, const char* fmt, ...)
@@ -135,55 +130,49 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
                                                      struct qxc_ast_expression_node* expr)
 {
+    struct qxc_jump_label snd_label;
+    struct qxc_jump_label end_label;
+    build_logical_or_jump_labels(gen, &snd_label, &end_label);
+
     generate_expression_asm(gen, offsets, expr->left_expr);
 
     emit(gen, "cmp rax, 0");
-    emit(gen, "je %s", gen->logical_or_jump_label);
+    emit(gen, "je %s", snd_label.buffer);
     emit(gen, "mov rax, 1");
-    emit(gen, "jmp %s", gen->logical_or_end_label);
+    emit(gen, "jmp %s", end_label.buffer);
 
-    const size_t old_indent_level = gen->indent_level;
-    gen->indent_level = 0;
-    emit(gen, "\n%s:", gen->logical_or_jump_label);
-    gen->indent_level = old_indent_level;
+    emit(gen, "\n%s:", snd_label.buffer);
 
     generate_expression_asm(gen, offsets, expr->right_expr);
     emit(gen, "cmp rax, 0");
     emit(gen, "mov rax, 0");
     emit(gen, "setne al");
 
-    gen->indent_level = 0;
-    emit(gen, "\n%s:", gen->logical_or_end_label);
-    gen->indent_level = old_indent_level;
-
-    qxc_codegen_increment_logical_or_count(gen);
+    emit(gen, "\n%s:", end_label.buffer);
 }
 
 static void generate_logical_AND_binop_expression_asm(
     struct qxc_codegen* gen, struct qxc_stack_offsets* offsets,
     struct qxc_ast_expression_node* expr)
 {
+    struct qxc_jump_label snd_label;
+    struct qxc_jump_label end_label;
+    build_logical_and_jump_labels(gen, &snd_label, &end_label);
+
     generate_expression_asm(gen, offsets, expr->left_expr);
 
     emit(gen, "cmp rax, 0");
-    emit(gen, "jne %s", gen->logical_and_jump_label);
-    emit(gen, "jmp %s", gen->logical_and_end_label);
+    emit(gen, "jne %s", snd_label.buffer);
+    emit(gen, "jmp %s", end_label.buffer);
 
-    const size_t _old_indent_level = gen->indent_level;
-    gen->indent_level = 0;
-    emit(gen, "%s:", gen->logical_and_jump_label);
-    gen->indent_level = _old_indent_level;
+    emit(gen, "%s:", snd_label.buffer);
 
     generate_expression_asm(gen, offsets, expr->right_expr);
     emit(gen, "cmp rax, 0");
     emit(gen, "mov rax, 0");
     emit(gen, "setne al");
 
-    gen->indent_level = 0;
-    emit(gen, "%s:", gen->logical_and_end_label);
-    gen->indent_level = _old_indent_level;
-
-    qxc_codegen_increment_logical_and_count(gen);
+    emit(gen, "%s:", end_label.buffer);
 }
 
 static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
@@ -323,20 +312,21 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             generate_binop_expression_asm(gen, offsets, expr);
             return;
 
-        case CONDITIONAL_EXPR:
+        case CONDITIONAL_EXPR: {
+            struct qxc_jump_label else_label;
+            struct qxc_jump_label post_label;
+            build_conditional_expr_jump_labels(gen, &else_label, &post_label);
+
             generate_expression_asm(gen, offsets, expr->conditional_expr);
-            // conditional expr result is now in rax
             emit(gen, "cmp rax, 0");
-            emit(gen, "je %s", gen->conditional_expr_else_label);
+            emit(gen, "je %s", else_label.buffer);
             generate_expression_asm(gen, offsets, expr->if_expr);
-            emit(gen, "jmp %s", gen->conditional_expr_post_label);
-            // if_expr result is now in rax
-            emit(gen, "\n%s:", gen->conditional_expr_else_label);
+            emit(gen, "jmp %s", post_label.buffer);
+            emit(gen, "\n%s:", else_label.buffer);
             generate_expression_asm(gen, offsets, expr->else_expr);
-            emit(gen, "\n%s:", gen->conditional_expr_post_label);
-            // else expr result is now in rax
-            qxc_codegen_increment_conditional_expr_count(gen);
+            emit(gen, "\n%s:", post_label.buffer);
             return;
+        }
 
         case VARIABLE_REFERENCE_EXPR:
             if (!qxc_stack_offsets_contains(offsets, expr->referenced_var_name)) {
@@ -370,33 +360,31 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             generate_expression_asm(gen, offsets, statement_node->standalone_expr);
             break;
 
-        case CONDITIONAL_STATEMENT:
+        case CONDITIONAL_STATEMENT: {
+            struct qxc_jump_label else_label;
+            struct qxc_jump_label post_label;
+            build_conditional_expr_jump_labels(gen, &else_label, &post_label);
+
             if (statement_node->else_branch_statement != NULL) {
                 generate_expression_asm(gen, offsets, statement_node->conditional_expr);
-                // conditional expr result is now in rax
                 emit(gen, "cmp rax, 0");
-                emit(gen, "je %s", gen->conditional_expr_else_label);
+                emit(gen, "je %s", else_label.buffer);
                 generate_statement_asm(gen, offsets, statement_node->if_branch_statement);
-                emit(gen, "jmp %s", gen->conditional_expr_post_label);
-                // if_expr result is now in rax
-                emit(gen, "\n%s:", gen->conditional_expr_else_label);
+                emit(gen, "jmp %s", post_label.buffer);
+                emit(gen, "\n%s:", else_label.buffer);
                 generate_statement_asm(gen, offsets,
                                        statement_node->else_branch_statement);
-                emit(gen, "\n%s:", gen->conditional_expr_post_label);
-                // else expr result is now in rax
-                qxc_codegen_increment_conditional_expr_count(gen);
+                emit(gen, "\n%s:", post_label.buffer);
             }
             else {
                 generate_expression_asm(gen, offsets, statement_node->conditional_expr);
-                // conditional expr result is now in rax
                 emit(gen, "cmp rax, 0");
-                emit(gen, "je %s", gen->conditional_expr_post_label);
+                emit(gen, "je %s", post_label.buffer);
                 generate_statement_asm(gen, offsets, statement_node->if_branch_statement);
-                emit(gen, "\n%s:", gen->conditional_expr_post_label);
-                // else expr result is now in rax
-                qxc_codegen_increment_conditional_expr_count(gen);
+                emit(gen, "\n%s:", post_label.buffer);
             }
             break;
+        }
 
         default:
             // printf("\nunrecognized statement type\n");
@@ -452,16 +440,8 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     gen.indent_level = 0;
 
     gen.logical_or_counter = 0;
-    sprintf(gen.logical_or_jump_label, "_LogicalOr_SndClause_0");
-    sprintf(gen.logical_or_end_label, "_LogicalOr_End_0");
-
     gen.logical_and_counter = 0;
-    sprintf(gen.logical_and_jump_label, "_LogicalAnd_SndClause_0");
-    sprintf(gen.logical_and_end_label, "_LogicalAnd_End_0");
-
     gen.conditional_expr_counter = 0;
-    sprintf(gen.conditional_expr_else_label, "_CondExpr_IfClause_0");
-    sprintf(gen.conditional_expr_post_label, "_CondExpr_PostClause_0");
 
     gen.asm_output = fopen(output_filepath, "w");
 

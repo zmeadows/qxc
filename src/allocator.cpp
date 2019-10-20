@@ -1,32 +1,20 @@
 #include "allocator.h"
 
-#include "prelude.h"
-
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-struct qxc_memory_pool {
-    struct qxc_memory_arena_chain* chain_tip;
-    size_t arena_size;
-};
+#include "prelude.h"
 
-struct qxc_memory_arena_chain {
-    uint8_t* start;
-    uint8_t* end;
-    uint8_t* bump_ptr;
-    struct qxc_memory_arena_chain* prev_link;
-};
-
-static void allocate_arena_chain_link(struct qxc_memory_pool* pool)
+void allocate_arena_chain_link(struct qxc_memory_pool* pool)
 {
     struct qxc_memory_arena_chain* old_tip = pool->chain_tip;
 
-    struct qxc_memory_arena_chain* new_tip =
-        malloc(sizeof(struct qxc_memory_arena_chain));
-    new_tip->start = calloc(pool->arena_size, 1);
+    auto new_tip = static_cast<struct qxc_memory_arena_chain*>(
+        malloc(sizeof(struct qxc_memory_arena_chain)));
+    new_tip->start = static_cast<uint8_t*>(calloc(pool->arena_size, 1));
     new_tip->end = new_tip->start + pool->arena_size;
     new_tip->bump_ptr = new_tip->start;
     new_tip->prev_link = old_tip;
@@ -36,21 +24,22 @@ static void allocate_arena_chain_link(struct qxc_memory_pool* pool)
 
 struct qxc_memory_pool* qxc_memory_pool_init(size_t arena_size_bytes)
 {
-    struct qxc_memory_pool* new_pool = malloc(sizeof(struct qxc_memory_pool));
+    struct qxc_memory_pool* new_pool =
+        static_cast<struct qxc_memory_pool*>(malloc(sizeof(struct qxc_memory_pool)));
     new_pool->chain_tip = NULL;
     new_pool->arena_size = arena_size_bytes;
     allocate_arena_chain_link(new_pool);
     return new_pool;
 }
 
-void* qxc_malloc(struct qxc_memory_pool* pool, size_t bytes)
+char* qxc_malloc_str(struct qxc_memory_pool* pool, size_t bytes)
 {
     struct qxc_memory_arena_chain* tip = pool->chain_tip;
 
     // TODO: exit condition for failure
     while (1) {
         if (tip->bump_ptr + bytes < tip->end) {
-            void* reserved_memory = pool->chain_tip->bump_ptr;
+            auto reserved_memory = (char*)(pool->chain_tip->bump_ptr);
             tip->bump_ptr += bytes;
             return reserved_memory;
         }

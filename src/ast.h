@@ -15,29 +15,32 @@ enum qxc_expression_type {
     INVALID_EXPR
 };
 
+// TODO: rename to _expr, make static alloc functions
+struct ast_unop_node {
+    enum qxc_operator op;
+    struct qxc_ast_expression_node* child_expr;
+};
+
+struct ast_binop_node {
+    enum qxc_operator op;
+    struct qxc_ast_expression_node* left_expr;
+    struct qxc_ast_expression_node* right_expr;
+};
+
+struct ast_conditional_node {
+    struct qxc_ast_expression_node* conditional_expr;
+    struct qxc_ast_expression_node* if_expr;
+    struct qxc_ast_expression_node* else_expr;
+};
+
 struct qxc_ast_expression_node {
     enum qxc_expression_type type;
 
     union {
         long literal;
-
-        struct {
-            enum qxc_operator unop;
-            struct qxc_ast_expression_node* unary_expr;
-        };
-
-        struct {
-            enum qxc_operator binop;
-            struct qxc_ast_expression_node* left_expr;
-            struct qxc_ast_expression_node* right_expr;
-        };
-
-        struct {
-            struct qxc_ast_expression_node* conditional_expr;
-            struct qxc_ast_expression_node* if_expr;
-            struct qxc_ast_expression_node* else_expr;
-        };
-
+        struct ast_unop_node unop_expr;
+        struct ast_binop_node binop_expr;
+        struct ast_conditional_node cond_expr;
         const char* referenced_var_name;
     };
 };
@@ -52,21 +55,19 @@ enum qxc_statement_type {
     INVALID_STATEMENT
 };
 
+struct ast_ifelse_statement {
+    struct qxc_ast_expression_node* conditional_expr;
+    struct qxc_ast_statement_node* if_branch_statement;
+    struct qxc_ast_statement_node* else_branch_statement;  // optional, may be NULL
+};
+
 struct qxc_ast_statement_node {
     enum qxc_statement_type type;
 
     union {
         struct qxc_ast_expression_node* return_expr;
-
-        struct {  // if/else statement
-            struct qxc_ast_expression_node* conditional_expr;
-            struct qxc_ast_statement_node* if_branch_statement;
-            struct qxc_ast_statement_node*
-                else_branch_statement;  // optional, may be NULL
-        };
-
+        struct ast_ifelse_statement ifelse_statement;
         struct qxc_block_item_list* compound_statement_block_items;
-
         struct qxc_ast_expression_node* standalone_expr;
     };
 };

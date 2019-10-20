@@ -1,7 +1,5 @@
 #pragma once
 
-#define _XOPEN_SOURCE 500L
-
 #include <stdbool.h>
 #include <stdlib.h>
 

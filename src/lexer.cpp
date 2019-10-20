@@ -46,7 +46,7 @@ static int qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* filep
 
     rewind(f);
 
-    tokenizer->contents = malloc(fsize + 1);
+    tokenizer->contents = (char*)malloc(fsize + 1);
     fread(tokenizer->contents, 1, fsize, f);
     fclose(f);
 

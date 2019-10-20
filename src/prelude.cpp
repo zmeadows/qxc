@@ -34,9 +34,9 @@ static int remove_callback(const char* pathname,
 const char* mk_tmp_dir(void)
 {
     /* Create the temporary directory */
-    char template[] = "/tmp/qxc.XXXXXX";
+    char _template[] = "/tmp/qxc.XXXXXX";
 
-    const char* tmp_dirname = mkdtemp(template);
+    const char* tmp_dirname = mkdtemp(_template);
 
     if (tmp_dirname == NULL) {
         perror("mkdtemp failed: ");

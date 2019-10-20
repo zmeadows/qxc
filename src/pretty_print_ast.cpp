@@ -22,17 +22,17 @@ void print_expression(struct qxc_ast_expression_node* node)
             break;
 
         case UNARY_OP_EXPR:
-            PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop));
+            PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop_expr.op));
             indent_level++;
-            print_expression(node->unary_expr);
+            print_expression(node->unop_expr.child_expr);
             indent_level--;
             break;
 
         case BINARY_OP_EXPR:
-            PPRINT("BinaryOp<%s>:\n", qxc_operator_to_str(node->binop));
+            PPRINT("BinaryOp<%s>:\n", qxc_operator_to_str(node->binop_expr.op));
             indent_level++;
-            print_expression(node->left_expr);
-            print_expression(node->right_expr);
+            print_expression(node->binop_expr.left_expr);
+            print_expression(node->binop_expr.right_expr);
             indent_level--;
             break;
 
@@ -45,15 +45,15 @@ void print_expression(struct qxc_ast_expression_node* node)
             indent_level++;
             PPRINT("Condition:\n");
             indent_level++;
-            print_expression(node->conditional_expr);
+            print_expression(node->cond_expr.conditional_expr);
             indent_level--;
             PPRINT("IfExpr:\n");
             indent_level++;
-            print_expression(node->if_expr);
+            print_expression(node->cond_expr.if_expr);
             indent_level--;
             PPRINT("ElseExpr:\n");
             indent_level++;
-            print_expression(node->else_expr);
+            print_expression(node->cond_expr.else_expr);
             indent_level--;
             indent_level--;
             break;
@@ -87,8 +87,10 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             indent_level--;
             return;
 
-        case CONDITIONAL_STATEMENT:
-            if (statement->else_branch_statement != NULL) {
+        case CONDITIONAL_STATEMENT: {
+            struct ast_ifelse_statement* ifelse_stmt = &statement->ifelse_statement;
+
+            if (ifelse_stmt->else_branch_statement != NULL) {
                 PPRINT("IfElseStatement:\n");
             }
             else {
@@ -98,24 +100,25 @@ static void print_statement(struct qxc_ast_statement_node* statement)
 
             PPRINT("Condition:\n");
             indent_level++;
-            print_expression(statement->conditional_expr);
+            print_expression(ifelse_stmt->conditional_expr);
             indent_level--;
             PPRINT("IfBranch:\n");
             indent_level++;
-            print_statement(statement->if_branch_statement);
+            print_statement(ifelse_stmt->if_branch_statement);
             indent_level--;
 
-            if (statement->else_branch_statement != NULL) {
+            if (ifelse_stmt->else_branch_statement != NULL) {
                 PPRINT("ElseBranch:\n");
                 indent_level++;
-                print_statement(statement->else_branch_statement);
+                print_statement(ifelse_stmt->else_branch_statement);
                 indent_level--;
             }
 
             indent_level--;
             return;
+        }
 
-        case COMPOUND_STATEMENT:
+        case COMPOUND_STATEMENT: {
             PPRINT("CompoundStatement:\n");
             indent_level++;
 
@@ -127,6 +130,7 @@ static void print_statement(struct qxc_ast_statement_node* statement)
 
             indent_level--;
             return;
+        }
 
         default:
             printf("\nunrecognized statement type! update pretty_print_ast.c!\n");

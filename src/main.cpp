@@ -1,10 +1,3 @@
-#include "allocator.h"
-#include "ast.h"
-#include "codegen.h"
-#include "lexer.h"
-#include "prelude.h"
-#include "pretty_print_ast.h"
-
 #include <assert.h>
 #include <libgen.h>
 #include <limits.h>
@@ -13,6 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "allocator.h"
+#include "ast.h"
+#include "codegen.h"
+#include "lexer.h"
+#include "prelude.h"
+#include "pretty_print_ast.h"
+#include "strbuf.h"
 
 enum qxc_mode { TOKENIZE_MODE, PARSE_MODE, COMPILE_MODE };
 

@@ -83,14 +83,14 @@ struct qxc_jump_label {
     char buffer[JUMP_LABEL_MAX_LENGTH];
 };
 
-static void build_logical_or_jump_labels(struct qxc_codegen* gen,
-                                         struct qxc_jump_label* snd_label,
-                                         struct qxc_jump_label* end_label)
-{
-    size_t count = ++gen->logical_or_counter;
-    qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu", count);
-    qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu", count);
-}
+// static void build_logical_or_jump_labels(struct qxc_codegen* gen,
+//                                          struct qxc_jump_label* snd_label,
+//                                          struct qxc_jump_label* end_label)
+// {
+//     size_t count = ++gen->logical_or_counter;
+//     qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu", count);
+//     qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu", count);
+// }
 
 static void build_logical_and_jump_labels(struct qxc_codegen* gen,
                                           struct qxc_jump_label* snd_label,
@@ -128,12 +128,18 @@ static void generate_expression_asm(struct qxc_codegen* gen,
 
 static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
-                                                     struct qxc_ast_expression_node* expr)
+                                                     struct ast_binop_node* binop_node)
 {
-    struct qxc_jump_label snd_label, end_label;
-    build_logical_or_jump_labels(gen, &snd_label, &end_label);
+    assert(binop_node->op == LOGICAL_OR_OP);
 
-    generate_expression_asm(gen, offsets, expr->left_expr);
+    struct qxc_jump_label snd_label, end_label;
+    const size_t jump_label_count = ++gen->logical_or_counter;
+    qxc_snprintf(snd_label.buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu",
+                 jump_label_count);
+    qxc_snprintf(end_label.buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu",
+                 jump_label_count);
+
+    generate_expression_asm(gen, offsets, binop_node->left_expr);
 
     emit(gen, "cmp rax, 0");
     emit(gen, "je %s", snd_label.buffer);
@@ -142,7 +148,7 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
 
     emit(gen, "\n%s:", snd_label.buffer);
 
-    generate_expression_asm(gen, offsets, expr->right_expr);
+    generate_expression_asm(gen, offsets, binop_node->right_expr);
     emit(gen, "cmp rax, 0");
     emit(gen, "mov rax, 0");
     emit(gen, "setne al");
@@ -150,14 +156,16 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
     emit(gen, "\n%s:", end_label.buffer);
 }
 
-static void generate_logical_AND_binop_expression_asm(
-    struct qxc_codegen* gen, struct qxc_stack_offsets* offsets,
-    struct qxc_ast_expression_node* expr)
+static void generate_logical_AND_binop_expression_asm(struct qxc_codegen* gen,
+                                                      struct qxc_stack_offsets* offsets,
+                                                      struct ast_binop_node* binop_node)
 {
+    assert(binop_node->op == LOGICAL_AND_OP);
+
     struct qxc_jump_label snd_label, end_label;
     build_logical_and_jump_labels(gen, &snd_label, &end_label);
 
-    generate_expression_asm(gen, offsets, expr->left_expr);
+    generate_expression_asm(gen, offsets, binop_node->left_expr);
 
     emit(gen, "cmp rax, 0");
     emit(gen, "jne %s", snd_label.buffer);
@@ -165,7 +173,7 @@ static void generate_logical_AND_binop_expression_asm(
 
     emit(gen, "%s:", snd_label.buffer);
 
-    generate_expression_asm(gen, offsets, expr->right_expr);
+    generate_expression_asm(gen, offsets, binop_node->right_expr);
     emit(gen, "cmp rax, 0");
     emit(gen, "mov rax, 0");
     emit(gen, "setne al");
@@ -175,15 +183,15 @@ static void generate_logical_AND_binop_expression_asm(
 
 static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
-                                                     struct qxc_ast_expression_node* expr)
+                                                     struct ast_binop_node* binop_node)
 {
-    assert(expr->left_expr && expr->right_expr);
-    assert(expr->left_expr->type == VARIABLE_REFERENCE_EXPR);
+    assert(binop_node->left_expr && binop_node->right_expr);
+    assert(binop_node->left_expr->type == VARIABLE_REFERENCE_EXPR);
 
-    const char* varname = expr->left_expr->referenced_var_name;
+    const char* varname = binop_node->left_expr->referenced_var_name;
 
     // generate value to be assigned to variable in left_expr
-    generate_expression_asm(gen, offsets, expr->right_expr);
+    generate_expression_asm(gen, offsets, binop_node->right_expr);
 
     if (!qxc_stack_offsets_contains(offsets, varname)) {
         fprintf(stderr, "attempted to assign value to un-initialized variable: %s\n",
@@ -196,37 +204,37 @@ static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
 
 static void generate_binop_expression_asm(struct qxc_codegen* gen,
                                           struct qxc_stack_offsets* offsets,
-                                          struct qxc_ast_expression_node* expr)
+                                          struct ast_binop_node* binop_node)
 {
-    assert(expr->type == BINARY_OP_EXPR);
+    const enum qxc_operator op = binop_node->op;
 
     // separate treatment due to short circuiting
-    if (expr->binop == LOGICAL_OR_OP) {
-        generate_logical_OR_binop_expression_asm(gen, offsets, expr);
+    if (op == LOGICAL_OR_OP) {
+        generate_logical_OR_binop_expression_asm(gen, offsets, binop_node);
         return;
     }
 
     // separate treatment due to short circuiting
-    if (expr->binop == LOGICAL_AND_OP) {
-        generate_logical_AND_binop_expression_asm(gen, offsets, expr);
+    if (op == LOGICAL_AND_OP) {
+        generate_logical_AND_binop_expression_asm(gen, offsets, binop_node);
         return;
     }
 
     // separate treatment to avoid evaluating left expr
-    if (expr->binop == ASSIGNMENT_OP) {
-        generate_assignment_binop_expression_asm(gen, offsets, expr);
+    if (op == ASSIGNMENT_OP) {
+        generate_assignment_binop_expression_asm(gen, offsets, binop_node);
         return;
     }
 
     // Now, all remaining binary operations behave similarly.
 
     // Put left hand operand in rax, right hand operand in rbx
-    generate_expression_asm(gen, offsets, expr->right_expr);
+    generate_expression_asm(gen, offsets, binop_node->right_expr);
     emit(gen, "push rax");
-    generate_expression_asm(gen, offsets, expr->left_expr);
+    generate_expression_asm(gen, offsets, binop_node->left_expr);
     emit(gen, "pop rbx");
 
-    switch (expr->binop) {
+    switch (op) {
         case PLUS_OP:
             emit(gen, "add rax, rbx");
             break;
@@ -278,17 +286,17 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
 
 static void generate_expression_asm(struct qxc_codegen* gen,
                                     struct qxc_stack_offsets* offsets,
-                                    struct qxc_ast_expression_node* expr)
+                                    struct qxc_ast_expression_node* node)
 {
-    switch (expr->type) {
+    switch (node->type) {
         case INT_LITERAL_EXPR:
-            emit(gen, "mov rax, %d", expr->literal);
+            emit(gen, "mov rax, %d", node->literal);
             return;
 
         case UNARY_OP_EXPR:
-            generate_expression_asm(gen, offsets, expr->unary_expr);
+            generate_expression_asm(gen, offsets, node->unop_expr.child_expr);
 
-            switch (expr->unop) {
+            switch (node->unop_expr.op) {
                 case MINUS_OP:
                     emit(gen, "neg rax");
                     break;
@@ -308,32 +316,32 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             return;
 
         case BINARY_OP_EXPR:
-            generate_binop_expression_asm(gen, offsets, expr);
+            generate_binop_expression_asm(gen, offsets, &node->binop_expr);
             return;
 
         case CONDITIONAL_EXPR: {
             struct qxc_jump_label else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
-            generate_expression_asm(gen, offsets, expr->conditional_expr);
+            generate_expression_asm(gen, offsets, node->cond_expr.conditional_expr);
             emit(gen, "cmp rax, 0");
             emit(gen, "je %s", else_label.buffer);
-            generate_expression_asm(gen, offsets, expr->if_expr);
+            generate_expression_asm(gen, offsets, node->cond_expr.if_expr);
             emit(gen, "jmp %s", post_label.buffer);
             emit(gen, "\n%s:", else_label.buffer);
-            generate_expression_asm(gen, offsets, expr->else_expr);
+            generate_expression_asm(gen, offsets, node->cond_expr.else_expr);
             emit(gen, "\n%s:", post_label.buffer);
             return;
         }
 
         case VARIABLE_REFERENCE_EXPR:
-            if (!qxc_stack_offsets_contains(offsets, expr->referenced_var_name)) {
+            if (!qxc_stack_offsets_contains(offsets, node->referenced_var_name)) {
                 fprintf(stderr, "referenced unknown variable: %s\n",
-                        expr->referenced_var_name);
+                        node->referenced_var_name);
                 exit(EXIT_FAILURE);
             }
             emit(gen, "mov rax, [rbp + %d]",
-                 qxc_stack_offsets_lookup(offsets, expr->referenced_var_name));
+                 qxc_stack_offsets_lookup(offsets, node->referenced_var_name));
             return;
 
         default:
@@ -362,22 +370,23 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             struct qxc_jump_label else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
-            if (statement_node->else_branch_statement != NULL) {
-                generate_expression_asm(gen, offsets, statement_node->conditional_expr);
+            struct ast_ifelse_statement* ifelse_stmt = &statement_node->ifelse_statement;
+
+            if (ifelse_stmt->else_branch_statement != NULL) {
+                generate_expression_asm(gen, offsets, ifelse_stmt->conditional_expr);
                 emit(gen, "cmp rax, 0");
                 emit(gen, "je %s", else_label.buffer);
-                generate_statement_asm(gen, offsets, statement_node->if_branch_statement);
+                generate_statement_asm(gen, offsets, ifelse_stmt->if_branch_statement);
                 emit(gen, "jmp %s", post_label.buffer);
                 emit(gen, "\n%s:", else_label.buffer);
-                generate_statement_asm(gen, offsets,
-                                       statement_node->else_branch_statement);
+                generate_statement_asm(gen, offsets, ifelse_stmt->else_branch_statement);
                 emit(gen, "\n%s:", post_label.buffer);
             }
             else {
-                generate_expression_asm(gen, offsets, statement_node->conditional_expr);
+                generate_expression_asm(gen, offsets, ifelse_stmt->conditional_expr);
                 emit(gen, "cmp rax, 0");
                 emit(gen, "je %s", post_label.buffer);
-                generate_statement_asm(gen, offsets, statement_node->if_branch_statement);
+                generate_statement_asm(gen, offsets, ifelse_stmt->if_branch_statement);
                 emit(gen, "\n%s:", post_label.buffer);
             }
             break;

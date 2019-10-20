@@ -1,5 +1,5 @@
 # Compiler
-CC = clang
+CC = g++
 
 # Project name
 PROJECT = qxc
@@ -9,15 +9,14 @@ OBJDIR = obj
 SRCDIR = src
 
 # Libraries
-MYCFLAGS = -Wall \
+MYCFLAGS = -std=c++11 \
+		   -Wall \
 		   -Wextra \
 		   -Wconversion \
 		   -Werror \
-		   -Wstrict-prototypes \
 		   -Wshadow \
 		   -Wpointer-arith \
 		   -Wcast-qual \
-		   -Wmissing-prototypes \
 		   -Wfloat-equal \
 		   -Wunreachable-code \
 		   -Wswitch-default \
@@ -25,26 +24,24 @@ MYCFLAGS = -Wall \
 		   -fno-omit-frame-pointer \
 		   -fstrict-aliasing \
 		   -pedantic \
-		   -D_DEFAULT_SOURCE \
 		   -g \
-		   -std=c11 \
 
 MYLIBS   = -lm
 
 CPPCHECK = cppcheck
 
 # Files and folders
-SRCS    = $(shell find $(SRCDIR) -type f -name '*.c')
+SRCS    = $(shell find $(SRCDIR) -type f -name '*.cpp')
 HEADERS = $(shell find $(SRCDIR) -type f -name "*.h")
 SRCDIRS = $(shell find $(SRCDIR) -type d | sed 's/$(SRCDIR)/./g' )
-OBJS    = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
+OBJS    = $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SRCS))
 
 # Targets
 $(PROJECT): buildrepo $(OBJS)
 	$(CC) -o $@ $(OBJS) $(MYCFLAGS) $(MYLIBS)
 	@$(call call-cppcheck)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c $(SRCDIR)/darray.h
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(SRCDIR)/darray.h
 	$(CC) -o $@ $< -c $(MYCFLAGS)
 
 clean:
@@ -64,5 +61,5 @@ define make-repo
 endef
 
 define call-cppcheck
-	cppcheck --suppress=missingIncludeSystem --enable=warning,performance,portability,information,missingInclude --std=c11 -q --inconclusive --std=posix  -I $(SRCDIR) $(SRCDIR)/*.c $(SRCDIR)/*.h
+	cppcheck --suppress=missingIncludeSystem --enable=warning,performance,portability,information,missingInclude --language=c++ --std=c++11 -q --inconclusive -I $(SRCDIR) $(SRCDIR)/*.cpp $(SRCDIR)/*.h
 endef

@@ -354,6 +354,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
                                    struct qxc_stack_offsets* offsets,
                                    struct qxc_ast_statement_node* statement_node)
 {
+    assert(statement_node);
     switch (statement_node->type) {
         case RETURN_STATEMENT:
             generate_expression_asm(gen, offsets, statement_node->return_expr);

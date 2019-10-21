@@ -23,6 +23,7 @@ MYCFLAGS = -std=c++11 \
 		   -Winline \
 		   -fno-omit-frame-pointer \
 		   -fstrict-aliasing \
+		   -lstdc++ \
 		   -pedantic \
 		   -g \
 

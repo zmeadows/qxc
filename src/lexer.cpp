@@ -1,5 +1,6 @@
 #include "lexer.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <math.h>
 #include <stdbool.h>
@@ -8,6 +9,7 @@
 #include <string.h>
 
 #include "allocator.h"
+#include "array.h"
 #include "prelude.h"
 #include "token.h"
 
@@ -184,9 +186,9 @@ static inline bool is_valid_symbol(char c)
 }
 
 static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
-                                   struct qxc_token_array* token_buffer, char c)
+                                   array<struct qxc_token>* token_buffer, char c)
 {
-    struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
+    struct qxc_token* new_token = array_extend(token_buffer);
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
 
@@ -213,17 +215,17 @@ static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
 }
 
 static inline void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
-                                            struct qxc_token_array* token_buffer)
+                                            array<struct qxc_token>* token_buffer)
 {
     qxc_build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
     qxc_tokenizer_advance(tokenizer);
 }
 
 static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
-                                     struct qxc_token_array* token_buffer,
+                                     array<struct qxc_token>* token_buffer,
                                      enum qxc_operator op)
 {
-    struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
+    struct qxc_token* new_token = array_extend(token_buffer);
     new_token->type = OPERATOR_TOKEN;
     new_token->op = op;
     new_token->line = tokenizer->current_line;
@@ -232,16 +234,16 @@ static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
 
 // 'consume' == build + advance tokenizer
 static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
-                                       struct qxc_token_array* token_buffer,
+                                       array<struct qxc_token>* token_buffer,
                                        enum qxc_operator op)
 {
     qxc_build_operator_token(tokenizer, token_buffer, op);
     qxc_tokenizer_advance(tokenizer);
 }
 
-int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
+int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath)
 {
-    qxc_token_array_clear(token_buffer);
+    array_clear(token_buffer);
 
     struct qxc_tokenizer tokenizer;
 
@@ -254,7 +256,7 @@ int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
         if (is_valid_keyword_identifier_first_character(tokenizer.next_char)) {
             qxc_tokenizer_consume_id(&tokenizer);
 
-            struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
+            struct qxc_token* new_token = array_extend(token_buffer);
 
             enum qxc_keyword keyword = qxc_str_to_keyword(tokenizer.id);
 
@@ -329,7 +331,7 @@ int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath)
                 return -1;
             }
 
-            struct qxc_token* new_token = qxc_token_array_extend(token_buffer);
+            struct qxc_token* new_token = array_extend(token_buffer);
             new_token->type = INTEGER_LITERAL_TOKEN;
             new_token->line = tokenizer.current_line;
             new_token->column = tokenizer.current_column - tokenizer.id_len;

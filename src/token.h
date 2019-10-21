@@ -1,9 +1,9 @@
 #pragma once
 
-#include "darray.h"
-
 #include <stdbool.h>
 #include <stddef.h>
+
+#include "darray.h"
 
 enum qxc_keyword {
     RETURN_KEYWORD,
@@ -76,6 +76,4 @@ struct qxc_token {
 };
 
 void qxc_token_print(struct qxc_token* token);
-
-DECLARE_DYNAMIC_ARRAY_NEWTYPE(qxc_token_array, struct qxc_token)
 

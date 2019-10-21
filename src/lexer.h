@@ -1,7 +1,7 @@
 #pragma once
 
+#include "array.h"
+#include "prelude.h"
 #include "token.h"
 
-#include "prelude.h"
-
-int qxc_tokenize(struct qxc_token_array* token_buffer, const char* filepath);
+int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath);

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "array.h"
 #include "lexer.h"
 #include "prelude.h"
 #include "pretty_print_ast.h"
@@ -28,11 +29,30 @@
 // <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int> | <id>
 // <unary_op> ::= "!" | "~" | "-"
 
+// TODO: pull out memory pool from parser struct
 struct qxc_parser {
     struct qxc_memory_pool* ast_memory_pool;
-    struct qxc_token_array token_buffer;
+    array<struct qxc_token> token_buffer;
     size_t itoken;
 };
+
+static struct qxc_parser parser_create(void)
+{
+    struct qxc_parser parser;
+
+    parser.ast_memory_pool = qxc_memory_pool_init(1e3);
+    parser.token_buffer = array_create<struct qxc_token>(256);
+    parser.itoken = 0;
+
+    return parser;
+}
+
+static void parser_destroy(struct qxc_parser* parser)
+{
+    // qxc_memory_pool_release(parser->ast_memory_pool);
+    array_destroy(&parser->token_buffer);
+    parser->itoken = 0;
+}
 
 #define EXPECT(EXPR, ...)                                                  \
     do {                                                                   \
@@ -126,7 +146,7 @@ static void qxc_block_item_list_append(struct qxc_parser* parser,
 static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 {
     if (parser->itoken < parser->token_buffer.length) {
-        return qxc_token_array_at(&parser->token_buffer, parser->itoken++);
+        return array_at(&parser->token_buffer, parser->itoken++);
     }
     else {
         return NULL;
@@ -136,7 +156,7 @@ static struct qxc_token* pop_next_token(struct qxc_parser* parser)
 static struct qxc_token* peek_next_token(struct qxc_parser* parser)
 {
     if (parser->itoken < parser->token_buffer.length) {
-        return qxc_token_array_at(&parser->token_buffer, parser->itoken);
+        return array_at(&parser->token_buffer, parser->itoken);
     }
     else {
         return NULL;
@@ -563,29 +583,16 @@ static struct qxc_ast_function_decl_node* qxc_parse_function_decl(
 
 struct qxc_program* qxc_parse(const char* filepath)
 {
-    struct qxc_parser parser;
-
-    parser.ast_memory_pool = qxc_memory_pool_init(10e3);
-    if (parser.ast_memory_pool == NULL) {
-        return NULL;
-    }
-
-    if (qxc_token_array_init(&parser.token_buffer, 256) != 0) {
-        return NULL;
-    }
+    struct qxc_parser parser = parser_create();
+    defer { parser_destroy(&parser); };
 
     if (qxc_tokenize(&parser.token_buffer, filepath) != 0) {
-        qxc_token_array_free(&parser.token_buffer);  // finished with tokens now
         return NULL;
     }
-
-    parser.itoken = 0;
 
     struct qxc_ast_function_decl_node* main_decl = qxc_parse_function_decl(&parser);
 
     EXPECT(main_decl, "Failed to parse main function declaration");
-
-    qxc_token_array_free(&parser.token_buffer);  // finished with tokens now
 
     auto program = qxc_malloc<struct qxc_program>(parser.ast_memory_pool);
     program->main_decl = main_decl;

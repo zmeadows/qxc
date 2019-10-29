@@ -1,118 +1,101 @@
 #pragma once
 
 #include "allocator.h"
+#include "array.h"
 #include "prelude.h"
 #include "token.h"
 
 // --------------------------------------------------------------------------------
 
-enum qxc_expression_type {
-    INT_LITERAL_EXPR,
-    UNARY_OP_EXPR,
-    BINARY_OP_EXPR,
-    VARIABLE_REFERENCE_EXPR,
-    CONDITIONAL_EXPR,
-    INVALID_EXPR
+enum class ExprType { IntLiteral, UnaryOp, BinaryOp, VariableRef, Conditional, Invalid };
+
+struct UnopExpr {
+    enum qxc_operator op = INVALID_OP;
+    struct ExprNode* child_expr = nullptr;
 };
 
-// TODO: rename to _expr, make static alloc functions
-struct ast_unop_node {
-    enum qxc_operator op;
-    struct qxc_ast_expression_node* child_expr;
+struct BinopExpr {
+    enum qxc_operator op = INVALID_OP;
+    struct ExprNode* left_expr = nullptr;
+    struct ExprNode* right_expr = nullptr;
 };
 
-struct ast_binop_node {
-    enum qxc_operator op;
-    struct qxc_ast_expression_node* left_expr;
-    struct qxc_ast_expression_node* right_expr;
+struct CondExpr {
+    struct ExprNode* conditional_expr = nullptr;
+    struct ExprNode* if_expr = nullptr;
+    struct ExprNode* else_expr = nullptr;
 };
 
-struct ast_conditional_node {
-    struct qxc_ast_expression_node* conditional_expr;
-    struct qxc_ast_expression_node* if_expr;
-    struct qxc_ast_expression_node* else_expr;
-};
-
-struct qxc_ast_expression_node {
-    enum qxc_expression_type type;
+struct ExprNode {
+    ExprType type = ExprType::Invalid;
 
     union {
         long literal;
-        struct ast_unop_node unop_expr;
-        struct ast_binop_node binop_expr;
-        struct ast_conditional_node cond_expr;
+        struct UnopExpr unop_expr;
+        struct BinopExpr binop_expr;
+        struct CondExpr cond_expr;
         const char* referenced_var_name;
     };
 };
 
 // --------------------------------------------------------------------------------
 
-enum qxc_statement_type {
-    RETURN_STATEMENT,
-    EXPRESSION_STATEMENT,
-    CONDITIONAL_STATEMENT,
-    COMPOUND_STATEMENT,
-    INVALID_STATEMENT
+enum class StatementType { Return, StandAloneExpr, IfElse, Compound, Invalid };
+
+struct StatementNode;
+
+struct IfElseStatement {
+    ExprNode* conditional_expr = nullptr;
+    StatementNode* if_branch_statement = nullptr;
+    StatementNode* else_branch_statement = nullptr;  // optional, may be NULL
 };
 
-struct ast_ifelse_statement {
-    struct qxc_ast_expression_node* conditional_expr;
-    struct qxc_ast_statement_node* if_branch_statement;
-    struct qxc_ast_statement_node* else_branch_statement;  // optional, may be NULL
-};
+struct BlockItemNode;
 
-struct qxc_ast_statement_node {
-    enum qxc_statement_type type;
+struct StatementNode {
+    StatementType type = StatementType::Invalid;
 
     union {
-        struct qxc_ast_expression_node* return_expr;
-        struct ast_ifelse_statement ifelse_statement;
-        struct qxc_block_item_list* compound_statement_block_items;
-        struct qxc_ast_expression_node* standalone_expr;
+        ExprNode* return_expr;
+        IfElseStatement* ifelse_statement;
+        array<BlockItemNode*> compound_statement_block_items;
+        ExprNode* standalone_expr;
     };
 };
 
 // --------------------------------------------------------------------------------
 
-struct qxc_ast_declaration_node {
-    char* var_name;
-    struct qxc_ast_expression_node* initializer_expr;
+struct Declaration {
+    char* var_name = nullptr;
+    struct ExprNode* initializer_expr = nullptr;
 };
 
 // --------------------------------------------------------------------------------
 
-enum qxc_block_item_type {
-    STATEMENT_BLOCK_ITEM,
-    DECLARATION_BLOCK_ITEM,
-    INVALID_BLOCK_ITEM
-};
+enum class BlockItemType { Statement, Declaration, Invalid };
 
-struct qxc_ast_block_item_node {
-    enum qxc_block_item_type type;
+struct BlockItemNode {
+    BlockItemType type = BlockItemType::Invalid;
+
     union {
-        struct qxc_ast_statement_node* statement;
-        struct qxc_ast_declaration_node* declaration;
+        StatementNode* statement;
+        Declaration* declaration;
     };
 };
 
-struct qxc_block_item_list {
-    struct qxc_ast_block_item_node* node;
-    struct qxc_block_item_list* next_node;
+// --------------------------------------------------------------------------------
+
+struct FunctionDecl {
+    const char* name = nullptr;
+    array<BlockItemNode*> blist;
 };
 
 // --------------------------------------------------------------------------------
 
-struct qxc_ast_function_decl_node {
-    const char* name;
-    struct qxc_block_item_list* blist;
+struct Program {  // program
+    FunctionDecl* main_decl = nullptr;
+    struct qxc_memory_pool* pool = nullptr;
 };
 
-// --------------------------------------------------------------------------------
-
-struct qxc_program {  // program
-    struct qxc_ast_function_decl_node* main_decl;
-    struct qxc_memory_pool* ast_memory_pool;
-};
-
-struct qxc_program* qxc_parse(const char* filepath);
+Program* qxc_parse(const char* filepath);
 

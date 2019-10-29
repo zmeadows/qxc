@@ -9,10 +9,10 @@ struct qxc_memory_pool {
 };
 
 struct qxc_memory_arena_chain {
-    uint8_t* start;
-    uint8_t* end;
-    uint8_t* bump_ptr;
-    struct qxc_memory_arena_chain* prev_link;
+    uint8_t* start = nullptr;
+    uint8_t* end = nullptr;
+    uint8_t* bump_ptr = nullptr;
+    struct qxc_memory_arena_chain* prev_link = nullptr;
 };
 
 struct qxc_memory_pool* qxc_memory_pool_init(size_t arena_size_bytes);

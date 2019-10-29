@@ -124,11 +124,11 @@ static void emit(struct qxc_codegen* gen, const char* fmt, ...)
 
 static void generate_expression_asm(struct qxc_codegen* gen,
                                     struct qxc_stack_offsets* offsets,
-                                    struct qxc_ast_expression_node* expr);
+                                    struct ExprNode* expr);
 
 static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
-                                                     struct ast_binop_node* binop_node)
+                                                     BinopExpr* binop_node)
 {
     assert(binop_node->op == LOGICAL_OR_OP);
 
@@ -158,7 +158,7 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
 
 static void generate_logical_AND_binop_expression_asm(struct qxc_codegen* gen,
                                                       struct qxc_stack_offsets* offsets,
-                                                      struct ast_binop_node* binop_node)
+                                                      BinopExpr* binop_node)
 {
     assert(binop_node->op == LOGICAL_AND_OP);
 
@@ -183,10 +183,10 @@ static void generate_logical_AND_binop_expression_asm(struct qxc_codegen* gen,
 
 static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
-                                                     struct ast_binop_node* binop_node)
+                                                     BinopExpr* binop_node)
 {
     assert(binop_node->left_expr && binop_node->right_expr);
-    assert(binop_node->left_expr->type == VARIABLE_REFERENCE_EXPR);
+    assert(binop_node->left_expr->type == ExprType::VariableRef);
 
     const char* varname = binop_node->left_expr->referenced_var_name;
 
@@ -204,7 +204,7 @@ static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
 
 static void generate_binop_expression_asm(struct qxc_codegen* gen,
                                           struct qxc_stack_offsets* offsets,
-                                          struct ast_binop_node* binop_node)
+                                          BinopExpr* binop_node)
 {
     const enum qxc_operator op = binop_node->op;
 
@@ -286,14 +286,14 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
 
 static void generate_expression_asm(struct qxc_codegen* gen,
                                     struct qxc_stack_offsets* offsets,
-                                    struct qxc_ast_expression_node* node)
+                                    struct ExprNode* node)
 {
     switch (node->type) {
-        case INT_LITERAL_EXPR:
+        case ExprType::IntLiteral:
             emit(gen, "mov rax, %d", node->literal);
             return;
 
-        case UNARY_OP_EXPR:
+        case ExprType::UnaryOp:
             generate_expression_asm(gen, offsets, node->unop_expr.child_expr);
 
             switch (node->unop_expr.op) {
@@ -315,11 +315,11 @@ static void generate_expression_asm(struct qxc_codegen* gen,
 
             return;
 
-        case BINARY_OP_EXPR:
+        case ExprType::BinaryOp:
             generate_binop_expression_asm(gen, offsets, &node->binop_expr);
             return;
 
-        case CONDITIONAL_EXPR: {
+        case ExprType::Conditional: {
             struct qxc_jump_label else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
@@ -334,7 +334,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             return;
         }
 
-        case VARIABLE_REFERENCE_EXPR:
+        case ExprType::VariableRef:
             if (!qxc_stack_offsets_contains(offsets, node->referenced_var_name)) {
                 fprintf(stderr, "referenced unknown variable: %s\n",
                         node->referenced_var_name);
@@ -352,28 +352,29 @@ static void generate_expression_asm(struct qxc_codegen* gen,
 
 static void generate_statement_asm(struct qxc_codegen* gen,
                                    struct qxc_stack_offsets* offsets,
-                                   struct qxc_ast_statement_node* statement_node)
+                                   StatementNode* statement_node)
 {
     assert(statement_node);
     switch (statement_node->type) {
-        case RETURN_STATEMENT:
+        case StatementType::Return:
             generate_expression_asm(gen, offsets, statement_node->return_expr);
             emit(gen, "mov rdi, rax");
             emit(gen, "mov rax, 60");  // syscall for exit
             emit(gen, "syscall");
             break;
 
-        case EXPRESSION_STATEMENT:
+        case StatementType::StandAloneExpr:
             generate_expression_asm(gen, offsets, statement_node->standalone_expr);
             break;
 
-        case CONDITIONAL_STATEMENT: {
+        case StatementType::IfElse: {
             struct qxc_jump_label else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
-            struct ast_ifelse_statement* ifelse_stmt = &statement_node->ifelse_statement;
+            IfElseStatement* ifelse_stmt = statement_node->ifelse_statement;
 
-            if (ifelse_stmt->else_branch_statement != NULL) {
+            // TODO: switch all NULL to nullptr
+            if (ifelse_stmt->else_branch_statement != nullptr) {
                 generate_expression_asm(gen, offsets, ifelse_stmt->conditional_expr);
                 emit(gen, "cmp rax, 0");
                 emit(gen, "je %s", else_label.buffer);
@@ -402,7 +403,7 @@ static void generate_statement_asm(struct qxc_codegen* gen,
 
 static void generate_declaration_asm(struct qxc_codegen* gen,
                                      struct qxc_stack_offsets* offsets,
-                                     struct qxc_ast_declaration_node* declaration)
+                                     Declaration* declaration)
 {
     if (qxc_stack_offsets_contains(offsets, declaration->var_name)) {
         fprintf(stderr, "variable declared twice: %s\n", declaration->var_name);
@@ -425,23 +426,23 @@ static void generate_declaration_asm(struct qxc_codegen* gen,
 
 static void generate_block_item_asm(struct qxc_codegen* gen,
                                     struct qxc_stack_offsets* offsets,
-                                    struct qxc_ast_block_item_node* block_item)
+                                    BlockItemNode* block_item)
 {
-    if (block_item->type == STATEMENT_BLOCK_ITEM) {
+    if (block_item->type == BlockItemType::Statement) {
         generate_statement_asm(gen, offsets, block_item->statement);
     }
-    else if (block_item->type == DECLARATION_BLOCK_ITEM) {
+    else if (block_item->type == BlockItemType::Declaration) {
         generate_declaration_asm(gen, offsets, block_item->declaration);
     }
     else {
-        assert(block_item->type == INVALID_BLOCK_ITEM);
+        assert(block_item->type == BlockItemType::Invalid);
         debug_print("invalid block item encountered in code generation");
     }
 }
 
 // static void generate_function_asm(struct qxc_godegen* gen) {}
 
-void generate_asm(struct qxc_program* program, const char* output_filepath)
+void generate_asm(Program* program, const char* output_filepath)
 {
     struct qxc_codegen gen;
     gen.indent_level = 0;
@@ -467,10 +468,8 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
     struct qxc_stack_offsets offsets = qxc_stack_offsets_new();
 
     if (program->main_decl != NULL) {
-        struct qxc_block_item_list* b = program->main_decl->blist;
-        while (b != NULL && b->node != NULL) {
-            generate_block_item_asm(&gen, &offsets, b->node);
-            b = b->next_node;
+        for (BlockItemNode* b : program->main_decl->blist) {
+            generate_block_item_asm(&gen, &offsets, b);
         }
     }
 
@@ -482,6 +481,6 @@ void generate_asm(struct qxc_program* program, const char* output_filepath)
 
     fclose(gen.asm_output);
 
-    qxc_memory_pool_release(program->ast_memory_pool);
+    qxc_memory_pool_release(program->pool);
 }
 

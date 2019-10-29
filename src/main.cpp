@@ -123,7 +123,7 @@ static int qxc_context_run(const struct qxc_context* ctx)
         return 0;
     }
 
-    struct qxc_program* program = qxc_parse(ctx->canonical_input_filepath);
+    Program* program = qxc_parse(ctx->canonical_input_filepath);
     if (program == NULL) {
         return -1;
     }
@@ -162,17 +162,16 @@ int main(int argc, char* argv[])
     struct qxc_context ctx;
 
     const int init_code = qxc_context_init(&ctx, argc, argv);
+    defer { qxc_context_deinit(&ctx); };
+
     if (init_code != 0) {
-        qxc_context_deinit(&ctx);
         return init_code;
     }
 
     const int run_code = qxc_context_run(&ctx);
     if (run_code != 0) {
-        qxc_context_deinit(&ctx);
         return run_code;
     }
 
-    qxc_context_deinit(&ctx);
     return EXIT_SUCCESS;
 }

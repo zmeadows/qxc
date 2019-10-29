@@ -14,21 +14,21 @@ static size_t indent_level;
         printf(__VA_ARGS__);                        \
     } while (0)
 
-void print_expression(struct qxc_ast_expression_node* node)
+void print_expression(struct ExprNode* node)
 {
     switch (node->type) {
-        case INT_LITERAL_EXPR:
+        case ExprType::IntLiteral:
             PPRINT("Int<%ld>\n", node->literal);
             break;
 
-        case UNARY_OP_EXPR:
+        case ExprType::UnaryOp:
             PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop_expr.op));
             indent_level++;
             print_expression(node->unop_expr.child_expr);
             indent_level--;
             break;
 
-        case BINARY_OP_EXPR:
+        case ExprType::BinaryOp:
             PPRINT("BinaryOp<%s>:\n", qxc_operator_to_str(node->binop_expr.op));
             indent_level++;
             print_expression(node->binop_expr.left_expr);
@@ -36,11 +36,11 @@ void print_expression(struct qxc_ast_expression_node* node)
             indent_level--;
             break;
 
-        case VARIABLE_REFERENCE_EXPR:
+        case ExprType::VariableRef:
             PPRINT("VariableRef<%s>\n", node->referenced_var_name);
             break;
 
-        case CONDITIONAL_EXPR:
+        case ExprType::Conditional:
             PPRINT("TernaryConditional\n");
             indent_level++;
             PPRINT("Condition:\n");
@@ -58,7 +58,7 @@ void print_expression(struct qxc_ast_expression_node* node)
             indent_level--;
             break;
 
-        case INVALID_EXPR:
+        case ExprType::Invalid:
             PPRINT("InvalidExpr");
             break;
 
@@ -68,27 +68,27 @@ void print_expression(struct qxc_ast_expression_node* node)
     }
 }
 
-static void print_block_item(struct qxc_ast_block_item_node* block_item);
+static void print_block_item(BlockItemNode* block_item);
 
-static void print_statement(struct qxc_ast_statement_node* statement)
+static void print_statement(StatementNode* statement)
 {
     switch (statement->type) {
-        case RETURN_STATEMENT:
+        case StatementType::Return:
             PPRINT("Return:\n");
             indent_level++;
             print_expression(statement->return_expr);
             indent_level--;
             return;
 
-        case EXPRESSION_STATEMENT:
+        case StatementType::StandAloneExpr:
             PPRINT("StandaloneExpr:\n");
             indent_level++;
             print_expression(statement->standalone_expr);
             indent_level--;
             return;
 
-        case CONDITIONAL_STATEMENT: {
-            struct ast_ifelse_statement* ifelse_stmt = &statement->ifelse_statement;
+        case StatementType::IfElse: {
+            IfElseStatement* ifelse_stmt = statement->ifelse_statement;
 
             if (ifelse_stmt->else_branch_statement != NULL) {
                 PPRINT("IfElseStatement:\n");
@@ -118,14 +118,12 @@ static void print_statement(struct qxc_ast_statement_node* statement)
             return;
         }
 
-        case COMPOUND_STATEMENT: {
+        case StatementType::Compound: {
             PPRINT("CompoundStatement:\n");
             indent_level++;
 
-            struct qxc_block_item_list* b = statement->compound_statement_block_items;
-            while (b->node != NULL) {
-                print_block_item(b->node);
-                b = b->next_node;
+            for (BlockItemNode* b : statement->compound_statement_block_items) {
+                print_block_item(b);
             }
 
             indent_level--;
@@ -138,7 +136,7 @@ static void print_statement(struct qxc_ast_statement_node* statement)
     }
 }
 
-static void print_declaration(struct qxc_ast_declaration_node* declaration)
+static void print_declaration(Declaration* declaration)
 {
     PPRINT("Declaration<%s>:\n", declaration->var_name);
     if (declaration->initializer_expr) {
@@ -148,21 +146,21 @@ static void print_declaration(struct qxc_ast_declaration_node* declaration)
     }
 }
 
-static void print_block_item(struct qxc_ast_block_item_node* block_item)
+static void print_block_item(BlockItemNode* block_item)
 {
-    if (block_item->type == STATEMENT_BLOCK_ITEM) {
+    if (block_item->type == BlockItemType::Statement) {
         print_statement(block_item->statement);
     }
-    else if (block_item->type == DECLARATION_BLOCK_ITEM) {
+    else if (block_item->type == BlockItemType::Declaration) {
         print_declaration(block_item->declaration);
     }
     else {
-        assert(block_item->type == INVALID_BLOCK_ITEM);
+        assert(block_item->type == BlockItemType::Invalid);
         fprintf(stderr, "invalid block item encountered");
     }
 }
 
-static void print_function_decl(struct qxc_ast_function_decl_node* node)
+static void print_function_decl(FunctionDecl* node)
 {
     PPRINT("FUNC NAME: %s\n", node->name);
     indent_level++;
@@ -171,15 +169,14 @@ static void print_function_decl(struct qxc_ast_function_decl_node* node)
     PPRINT("BODY:\n");
     indent_level++;
 
-    struct qxc_block_item_list* b = node->blist;
-    while (b->node != NULL) {
-        print_block_item(b->node);
-        b = b->next_node;
+    for (BlockItemNode* b : node->blist) {
+        print_block_item(b);
     }
+
     indent_level -= 2;
 }
 
-void print_program(struct qxc_program* program)
+void print_program(Program* program)
 {
     indent_level = 0;
     print_function_decl(program->main_decl);

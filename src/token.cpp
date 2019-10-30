@@ -7,77 +7,77 @@
 #include "darray.h"
 #include "prelude.h"
 
-const char* qxc_keyword_to_str(enum qxc_keyword keyword)
+const char* qxc_keyword_to_str(Keyword keyword)
 {
     switch (keyword) {
-        case RETURN_KEYWORD:
+        case Keyword::Return:
             return "return";
-        case INT_KEYWORD:
+        case Keyword::Int:
             return "int";
-        case IF_KEYWORD:
+        case Keyword::If:
             return "if";
-        case ELSE_KEYWORD:
+        case Keyword::Else:
             return "else";
         default:
             return NULL;
     }
 }
 
-enum qxc_keyword qxc_str_to_keyword(const char* kstr)
+Keyword qxc_str_to_keyword(const char* kstr)
 {
     if (strs_are_equal("return", kstr)) {
-        return RETURN_KEYWORD;
+        return Keyword::Return;
     }
     else if (strs_are_equal("int", kstr)) {
-        return INT_KEYWORD;
+        return Keyword::Int;
     }
     else if (strs_are_equal("if", kstr)) {
-        return IF_KEYWORD;
+        return Keyword::If;
     }
     else if (strs_are_equal("else", kstr)) {
-        return ELSE_KEYWORD;
+        return Keyword::Else;
     }
     else {
-        return INVALID_KEYWORD;
+        return Keyword::Invalid;
     }
 }
 
-const char* qxc_operator_to_str(enum qxc_operator op)
+const char* qxc_operator_to_str(Operator op)
 {
     switch (op) {
-        case MINUS_OP:
+        case Operator::Minus:
             return "-";
-        case PLUS_OP:
+        case Operator::Plus:
             return "+";
-        case DIVIDE_OP:
+        case Operator::Divide:
             return "/";
-        case MULTIPLY_OP:
+        case Operator::Multiply:
             return "*";
-        case NEGATION_OP:
+        case Operator::LogicalNegation:
             return "!";
-        case COMPLEMENT_OP:
+        case Operator::Complement:
             return "~";
-        case LOGICAL_AND_OP:
+        case Operator::LogicalAND:
             return "&&";
-        case LOGICAL_OR_OP:
+        case Operator::LogicalOR:
             return "||";
-        case EQUAL_TO_OP:
+        case Operator::EqualTo:
             return "==";
-        case NOT_EQUAL_TO_OP:
+        case Operator::NotEqualTo:
             return "!=";
-        case LESS_THAN_OP:
+        case Operator::LessThan:
             return "<";
-        case LESS_THAN_OR_EQUAL_TO_OP:
+        case Operator::LessThanOrEqualTo:
             return "<=";
-        case GREATER_THAN_OP:
+        case Operator::GreaterThan:
             return ">";
-        case GREATER_THAN_OR_EQUAL_TO_OP:
+        case Operator::GreaterThanOrEqualTo:
             return ">=";
-        case COLON_OP:
+        case Operator::Colon:
             return ":";
-        case QUESTION_MARK_OP:
+        case Operator::QuestionMark:
             return "?";
-        case ASSIGNMENT_OP:
+        case Operator::Assignment:
             return "=";
         default:
             return NULL;
@@ -86,26 +86,26 @@ const char* qxc_operator_to_str(enum qxc_operator op)
 
 // TODO: eventually multiply_op will serve as
 // unary pointer dereference operator as well
-bool qxc_operator_can_be_unary(enum qxc_operator op)
+bool qxc_operator_can_be_unary(Operator op)
 {
     switch (op) {
-        case MINUS_OP:
+        case Operator::Minus:
             return true;
-        case NEGATION_OP:
+        case Operator::LogicalNegation:
             return true;
-        case COMPLEMENT_OP:
+        case Operator::Complement:
             return true;
         default:
             return false;
     }
 }
 
-bool qxc_operator_is_always_unary(enum qxc_operator op)
+bool qxc_operator_is_always_unary(Operator op)
 {
     switch (op) {
-        case NEGATION_OP:
+        case Operator::LogicalNegation:
             return true;
-        case COMPLEMENT_OP:
+        case Operator::Complement:
             return true;
         default:
             return false;

@@ -10,12 +10,12 @@
 enum class ExprType { IntLiteral, UnaryOp, BinaryOp, VariableRef, Conditional, Invalid };
 
 struct UnopExpr {
-    enum qxc_operator op = INVALID_OP;
+    Operator op = Operator::Invalid;
     struct ExprNode* child_expr = nullptr;
 };
 
 struct BinopExpr {
-    enum qxc_operator op = INVALID_OP;
+    Operator op = Operator::Invalid;
     struct ExprNode* left_expr = nullptr;
     struct ExprNode* right_expr = nullptr;
 };

@@ -130,7 +130,7 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
                                                      struct qxc_stack_offsets* offsets,
                                                      BinopExpr* binop_node)
 {
-    assert(binop_node->op == LOGICAL_OR_OP);
+    assert(binop_node->op == Operator::LogicalOR);
 
     struct qxc_jump_label snd_label, end_label;
     const size_t jump_label_count = ++gen->logical_or_counter;
@@ -160,7 +160,7 @@ static void generate_logical_AND_binop_expression_asm(struct qxc_codegen* gen,
                                                       struct qxc_stack_offsets* offsets,
                                                       BinopExpr* binop_node)
 {
-    assert(binop_node->op == LOGICAL_AND_OP);
+    assert(binop_node->op == Operator::LogicalAND);
 
     struct qxc_jump_label snd_label, end_label;
     build_logical_and_jump_labels(gen, &snd_label, &end_label);
@@ -206,22 +206,22 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
                                           struct qxc_stack_offsets* offsets,
                                           BinopExpr* binop_node)
 {
-    const enum qxc_operator op = binop_node->op;
+    const Operator op = binop_node->op;
 
     // separate treatment due to short circuiting
-    if (op == LOGICAL_OR_OP) {
+    if (op == Operator::LogicalOR) {
         generate_logical_OR_binop_expression_asm(gen, offsets, binop_node);
         return;
     }
 
     // separate treatment due to short circuiting
-    if (op == LOGICAL_AND_OP) {
+    if (op == Operator::LogicalAND) {
         generate_logical_AND_binop_expression_asm(gen, offsets, binop_node);
         return;
     }
 
     // separate treatment to avoid evaluating left expr
-    if (op == ASSIGNMENT_OP) {
+    if (op == Operator::Assignment) {
         generate_assignment_binop_expression_asm(gen, offsets, binop_node);
         return;
     }
@@ -235,45 +235,45 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
     emit(gen, "pop rbx");
 
     switch (op) {
-        case PLUS_OP:
+        case Operator::Plus:
             emit(gen, "add rax, rbx");
             break;
-        case MINUS_OP:
+        case Operator::Minus:
             emit(gen, "sub rax, rbx");
             break;
-        case DIVIDE_OP:
+        case Operator::Divide:
             emit(gen, "xor rdx, rdx");
             emit(gen, "idiv rbx");
             break;
-        case MULTIPLY_OP:
+        case Operator::Multiply:
             emit(gen, "imul rbx");
             break;
-        case EQUAL_TO_OP:
+        case Operator::EqualTo:
             emit(gen, "cmp rax, rbx");
             emit(gen, "mov rax, 0");
             emit(gen, "sete al");
             break;
-        case NOT_EQUAL_TO_OP:
+        case Operator::NotEqualTo:
             emit(gen, "cmp rax, rbx");
             emit(gen, "mov rax, 0");
             emit(gen, "setne al");
             break;
-        case LESS_THAN_OP:
+        case Operator::LessThan:
             emit(gen, "cmp rax, rbx");
             emit(gen, "mov rax, 0");
             emit(gen, "setl al");
             break;
-        case LESS_THAN_OR_EQUAL_TO_OP:
+        case Operator::LessThanOrEqualTo:
             emit(gen, "cmp rax, rbx");
             emit(gen, "mov rax, 0");
             emit(gen, "setle al");
             break;
-        case GREATER_THAN_OP:
+        case Operator::GreaterThan:
             emit(gen, "cmp rax, rbx");
             emit(gen, "mov rax, 0");
             emit(gen, "setg al");
             break;
-        case GREATER_THAN_OR_EQUAL_TO_OP:
+        case Operator::GreaterThanOrEqualTo:
             emit(gen, "cmp rax, rbx");
             emit(gen, "mov rax, 0");
             emit(gen, "setge al");
@@ -297,13 +297,13 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             generate_expression_asm(gen, offsets, node->unop_expr.child_expr);
 
             switch (node->unop_expr.op) {
-                case MINUS_OP:
+                case Operator::Minus:
                     emit(gen, "neg rax");
                     break;
-                case COMPLEMENT_OP:
+                case Operator::Complement:
                     emit(gen, "not rax");
                     break;
-                case NEGATION_OP:
+                case Operator::LogicalNegation:
                     emit(gen, "cmp rax, 0");
                     emit(gen, "mov rax, 0");
                     emit(gen, "sete al");

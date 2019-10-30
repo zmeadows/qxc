@@ -146,7 +146,7 @@ static struct qxc_token* qxc_parser_expect_token_type(
 }
 
 static struct qxc_token* qxc_parser_expect_keyword(Parser* parser,
-                                                   enum qxc_keyword expected_keyword)
+                                                   Keyword expected_keyword)
 {
     struct qxc_token* next_token = pop_next_token(parser);
 
@@ -170,7 +170,7 @@ static struct qxc_token* qxc_parser_expect_identifier(Parser* parser,
 }
 
 // static struct qxc_token* qxc_parser_expect_operator(Parser* parser,
-//                                                     enum qxc_operator expected_op)
+//                                                     Operator expected_op)
 // {
 //     struct qxc_token* next_token = pop_next_token(parser);
 //
@@ -235,61 +235,61 @@ static struct ExprNode* qxc_parse_factor(Parser* parser)
 }
 
 // TODO: clean this up and handle all errors with informative print statements
-static int binop_precedence(enum qxc_operator op)
+static int binop_precedence(Operator op)
 {
     switch (op) {
-        case MINUS_OP:
+        case Operator::Minus:
             return 12;
-        case PLUS_OP:
+        case Operator::Plus:
             return 12;
-        case DIVIDE_OP:
+        case Operator::Divide:
             return 13;
-        case MULTIPLY_OP:
+        case Operator::Multiply:
             return 13;
-        case LOGICAL_AND_OP:
+        case Operator::LogicalAND:
             return 5;
-        case LOGICAL_OR_OP:
+        case Operator::LogicalOR:
             return 4;
-        case EQUAL_TO_OP:
+        case Operator::EqualTo:
             return 9;
-        case NOT_EQUAL_TO_OP:
+        case Operator::NotEqualTo:
             return 9;
-        case COLON_OP:
+        case Operator::Colon:
             return 3;
-        case QUESTION_MARK_OP:
+        case Operator::QuestionMark:
             return 3;
-        case LESS_THAN_OP:
+        case Operator::LessThan:
             return 10;
-        case LESS_THAN_OR_EQUAL_TO_OP:
+        case Operator::LessThanOrEqualTo:
             return 10;
-        case GREATER_THAN_OP:
+        case Operator::GreaterThan:
             return 10;
-        case GREATER_THAN_OR_EQUAL_TO_OP:
+        case Operator::GreaterThanOrEqualTo:
             return 10;
-        case ASSIGNMENT_OP:
+        case Operator::Assignment:
             return 2;
-        case COMMA_OP:
+        case Operator::Comma:
             return 1;
-        case BITWISE_OR_OP:
+        case Operator::BitwiseOR:
             return 6;
-        case BITWISE_AND_OP:
+        case Operator::BitwiseAND:
             return 8;
-        case BITWISE_XOR_OP:
+        case Operator::BitwiseXOR:
             return 7;
-        case BITSHIFT_LEFT_OP:
+        case Operator::BitShiftLeft:
             return 11;
-        case BITSHIFT_RIGHT_OP:
+        case Operator::BitShiftRight:
             return 11;
-        case PERCENT_OP:
+        case Operator::Percent:
             return 13;
-        case INVALID_OP:
+        case Operator::Invalid:
             return -999;
         default:
             QXC_UNREACHABLE();
     }
 }
 
-static bool binop_valid_for_logical_or_expr_or_below(enum qxc_operator op)
+static bool binop_valid_for_logical_or_expr_or_below(Operator op)
 {
     return binop_precedence(op) > 3;
 }
@@ -304,7 +304,8 @@ static struct ExprNode* qxc_parse_logical_or_expr_(Parser* parser, ExprNode* lef
 
     while (next_token->type == OPERATOR_TOKEN &&
            binop_valid_for_logical_or_expr_or_below(next_token->op)) {
-        EXPECT(next_token->op != ASSIGNMENT_OP, "assignment operator in invalid place!");
+        EXPECT(next_token->op != Operator::Assignment,
+               "assignment operator in invalid place!");
         const int next_op_precedence = binop_precedence(next_token->op);
 
         if (next_op_precedence <= min_precedence) {
@@ -345,7 +346,7 @@ static struct ExprNode* qxc_parse_conditional_expression(Parser* parser,
     struct qxc_token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
-    if (next_token->op == QUESTION_MARK_OP) {
+    if (next_token->op == Operator::QuestionMark) {
         (void)pop_next_token(parser);
 
         struct ExprNode* ternary_expr = alloc_empty_expression(parser);
@@ -372,14 +373,14 @@ static struct ExprNode* qxc_parse_expression(Parser* parser)
     EXPECT_(next_token);
 
     // assignment operator is right-associative, so special treatment here
-    if (next_token->op == ASSIGNMENT_OP) {
+    if (next_token->op == Operator::Assignment) {
         EXPECT(left_factor->type == ExprType::VariableRef,
                "left hand side of assignment operator must be a variable reference!");
         (void)pop_next_token(parser);
 
         struct ExprNode* assign_expr = alloc_empty_expression(parser);
         assign_expr->type = ExprType::BinaryOp;
-        assign_expr->binop_expr.op = ASSIGNMENT_OP;
+        assign_expr->binop_expr.op = Operator::Assignment;
         assign_expr->binop_expr.left_expr = left_factor;
         assign_expr->binop_expr.right_expr = qxc_parse_expression(parser);
 
@@ -393,7 +394,7 @@ static struct ExprNode* qxc_parse_expression(Parser* parser)
 static Declaration* qxc_parse_declaration(Parser* parser)
 {
     struct qxc_token* next_token = pop_next_token(parser);  // pop off int keyword
-    assert(next_token->type == KEYWORD_TOKEN && next_token->keyword == INT_KEYWORD);
+    assert(next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::Int);
 
     Declaration* new_declaration = alloc_empty_declaration_node(parser);
 
@@ -410,7 +411,7 @@ static Declaration* qxc_parse_declaration(Parser* parser)
     next_token = peek_next_token(parser);
 
     if (next_token && next_token->type == OPERATOR_TOKEN &&
-        next_token->op == ASSIGNMENT_OP) {
+        next_token->op == Operator::Assignment) {
         pop_next_token(parser);  // pop off '='
         new_declaration->initializer_expr = qxc_parse_expression(parser);
         EXPECT(new_declaration->initializer_expr, "Failed to parse variable initializer");
@@ -430,7 +431,7 @@ static StatementNode* qxc_parse_statement(Parser* parser)
 
     StatementNode* statement = alloc_empty_statement(parser);
 
-    if (next_token->type == KEYWORD_TOKEN && next_token->keyword == RETURN_KEYWORD) {
+    if (next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::Return) {
         pop_next_token(parser);  // pop off return keyword
         statement->type = StatementType::Return;
         statement->return_expr = qxc_parse_expression(parser);
@@ -439,7 +440,7 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
                "Missing semicolon at end of statement");
     }
-    else if (next_token->type == KEYWORD_TOKEN && next_token->keyword == IF_KEYWORD) {
+    else if (next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::If) {
         (void)pop_next_token(parser);  // pop off 'if' keyword
         statement->type = StatementType::IfElse;
 
@@ -453,7 +454,7 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         next_token = peek_next_token(parser);
 
         if (next_token && next_token->type == KEYWORD_TOKEN &&
-            next_token->keyword == ELSE_KEYWORD) {
+            next_token->keyword == Keyword::Else) {
             (void)pop_next_token(parser);  // pop off 'else' keyword
             ifelse_stmt->else_branch_statement = qxc_parse_statement(parser);
             EXPECT_(ifelse_stmt->else_branch_statement);
@@ -501,7 +502,7 @@ static BlockItemNode* qxc_parse_block_item(Parser* parser)
 
     BlockItemNode* block_item = alloc_empty_block_item(parser);
 
-    if (next_token->type == KEYWORD_TOKEN && next_token->keyword == INT_KEYWORD) {
+    if (next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::Int) {
         block_item->type = BlockItemType::Declaration;
         block_item->declaration = qxc_parse_declaration(parser);
         EXPECT_(block_item->declaration);
@@ -517,7 +518,7 @@ static BlockItemNode* qxc_parse_block_item(Parser* parser)
 
 static FunctionDecl* qxc_parse_function_decl(Parser* parser)
 {
-    EXPECT(qxc_parser_expect_keyword(parser, INT_KEYWORD),
+    EXPECT(qxc_parser_expect_keyword(parser, Keyword::Int),
            "Invalid main type signature, must return int.");
 
     EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");

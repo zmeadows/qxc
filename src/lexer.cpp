@@ -95,63 +95,63 @@ static inline bool is_valid_operator_first_character(char c)
 
 static inline bool can_be_digraph_first_character(char c) { return strchr("&|!=<>", c); }
 
-static inline enum qxc_operator try_build_digraph_operator(char c1, char c2)
+static inline Operator try_build_digraph_operator(char c1, char c2)
 {
-    if (!can_be_digraph_first_character(c1)) return INVALID_OP;
+    if (!can_be_digraph_first_character(c1)) return Operator::Invalid;
 
     switch (c1) {
         case '&':
-            if (c2 == '&') return LOGICAL_AND_OP;
+            if (c2 == '&') return Operator::LogicalAND;
             break;
         case '|':
-            if (c2 == '|') return LOGICAL_OR_OP;
+            if (c2 == '|') return Operator::LogicalOR;
             break;
         case '!':
-            if (c2 == '=') return NOT_EQUAL_TO_OP;
+            if (c2 == '=') return Operator::NotEqualTo;
             break;
         case '=':
-            if (c2 == '=') return EQUAL_TO_OP;
+            if (c2 == '=') return Operator::EqualTo;
             break;
         case '<':
-            if (c2 == '=') return LESS_THAN_OR_EQUAL_TO_OP;
+            if (c2 == '=') return Operator::LessThanOrEqualTo;
             break;
         case '>':
-            if (c2 == '=') return GREATER_THAN_OR_EQUAL_TO_OP;
+            if (c2 == '=') return Operator::GreaterThanOrEqualTo;
             break;
         default:
             break;
     }
 
-    return INVALID_OP;
+    return Operator::Invalid;
 }
 
-static inline enum qxc_operator build_unigraph_operator(char c)
+static inline Operator build_unigraph_operator(char c)
 {
     switch (c) {
         case '-':
-            return MINUS_OP;
+            return Operator::Minus;
         case '+':
-            return PLUS_OP;
+            return Operator::Plus;
         case '/':
-            return DIVIDE_OP;
+            return Operator::Divide;
         case '*':
-            return MULTIPLY_OP;
+            return Operator::Multiply;
         case '!':
-            return NEGATION_OP;
+            return Operator::LogicalNegation;
         case '>':
-            return GREATER_THAN_OP;
+            return Operator::GreaterThan;
         case '<':
-            return LESS_THAN_OP;
+            return Operator::LessThan;
         case '~':
-            return COMPLEMENT_OP;
+            return Operator::Complement;
         case ':':
-            return COLON_OP;
+            return Operator::Colon;
         case '?':
-            return QUESTION_MARK_OP;
+            return Operator::QuestionMark;
         case '=':
-            return ASSIGNMENT_OP;
+            return Operator::Assignment;
         default:
-            return INVALID_OP;
+            return Operator::Invalid;
     }
 }
 
@@ -222,8 +222,7 @@ static inline void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
 }
 
 static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
-                                     array<struct qxc_token>* token_buffer,
-                                     enum qxc_operator op)
+                                     array<struct qxc_token>* token_buffer, Operator op)
 {
     struct qxc_token* new_token = array_extend(token_buffer);
     new_token->type = OPERATOR_TOKEN;
@@ -234,8 +233,7 @@ static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
 
 // 'consume' == build + advance tokenizer
 static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
-                                       array<struct qxc_token>* token_buffer,
-                                       enum qxc_operator op)
+                                       array<struct qxc_token>* token_buffer, Operator op)
 {
     qxc_build_operator_token(tokenizer, token_buffer, op);
     qxc_tokenizer_advance(tokenizer);
@@ -258,9 +256,9 @@ int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath)
 
             struct qxc_token* new_token = array_extend(token_buffer);
 
-            enum qxc_keyword keyword = qxc_str_to_keyword(tokenizer.id);
+            Keyword keyword = qxc_str_to_keyword(tokenizer.id);
 
-            if (keyword == INVALID_KEYWORD) {
+            if (keyword == Keyword::Invalid) {
                 // it's an identifier, not a keyword
                 new_token->type = IDENTIFIER_TOKEN;
 
@@ -285,15 +283,15 @@ int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath)
             qxc_tokenizer_advance(&tokenizer);
             char c2 = tokenizer.next_char;
 
-            enum qxc_operator digraph_op = try_build_digraph_operator(c1, c2);
+            Operator digraph_op = try_build_digraph_operator(c1, c2);
 
-            if (digraph_op != INVALID_OP) {
+            if (digraph_op != Operator::Invalid) {
                 qxc_consume_operator_token(&tokenizer, token_buffer, digraph_op);
             }
             else {
-                enum qxc_operator maybe_unigraph_op = build_unigraph_operator(c1);
+                Operator maybe_unigraph_op = build_unigraph_operator(c1);
 
-                if (maybe_unigraph_op != INVALID_OP) {
+                if (maybe_unigraph_op != Operator::Invalid) {
                     qxc_build_operator_token(&tokenizer, token_buffer, maybe_unigraph_op);
                 }
                 else if (c1 == '=') {

@@ -31,7 +31,7 @@
 
 struct Parser {
     struct qxc_memory_pool* pool;
-    array<struct qxc_token> token_buffer;
+    array<Token> token_buffer;
     size_t itoken;
 
     static Parser create(void)
@@ -39,7 +39,7 @@ struct Parser {
         Parser parser;
 
         parser.pool = qxc_memory_pool_init(1e3);
-        parser.token_buffer = array_create<struct qxc_token>(256);
+        parser.token_buffer = array_create<Token>(256);
         parser.itoken = 0;
 
         return parser;
@@ -117,7 +117,7 @@ static inline FunctionDecl* alloc_empty_function_decl(Parser* parser)
 //     }
 // }
 
-static struct qxc_token* pop_next_token(Parser* parser)
+static Token* pop_next_token(Parser* parser)
 {
     if (parser->itoken < parser->token_buffer.length) {
         return array_at(&parser->token_buffer, parser->itoken++);
@@ -127,7 +127,7 @@ static struct qxc_token* pop_next_token(Parser* parser)
     }
 }
 
-static struct qxc_token* peek_next_token(Parser* parser)
+static Token* peek_next_token(Parser* parser)
 {
     if (parser->itoken < parser->token_buffer.length) {
         return array_at(&parser->token_buffer, parser->itoken);
@@ -137,45 +137,44 @@ static struct qxc_token* peek_next_token(Parser* parser)
     }
 }
 
-static struct qxc_token* qxc_parser_expect_token_type(
-    Parser* parser, enum qxc_token_type expected_token_type)
+static Token* qxc_parser_expect_token_type(Parser* parser, TokenType expected_token_type)
 {
-    struct qxc_token* next_token = pop_next_token(parser);
+    Token* next_token = pop_next_token(parser);
     EXPECT_(next_token && next_token->type == expected_token_type);
     return next_token;
 }
 
-static struct qxc_token* qxc_parser_expect_keyword(Parser* parser,
-                                                   Keyword expected_keyword)
+static Token* qxc_parser_expect_keyword(Parser* parser, Keyword expected_keyword)
 {
-    struct qxc_token* next_token = pop_next_token(parser);
+    Token* next_token = pop_next_token(parser);
 
-    EXPECT(next_token && next_token->type == KEYWORD_TOKEN, "Expected keyword token");
+    EXPECT(next_token && next_token->type == TokenType::KeyWord,
+           "Expected keyword token");
     EXPECT(next_token->keyword == expected_keyword, "Unexpected keyword token: %s",
-           qxc_keyword_to_str(next_token->keyword));
+           keyword_to_str(next_token->keyword));
 
     return next_token;
 }
 
-static struct qxc_token* qxc_parser_expect_identifier(Parser* parser,
-                                                      const char* expected_identifier)
+static Token* qxc_parser_expect_identifier(Parser* parser,
+                                           const char* expected_identifier)
 {
-    struct qxc_token* next_token = pop_next_token(parser);
+    Token* next_token = pop_next_token(parser);
 
-    EXPECT(next_token && next_token->type == IDENTIFIER_TOKEN &&
+    EXPECT(next_token && next_token->type == TokenType::Identifier &&
                strs_are_equal(next_token->name, expected_identifier),
            "Expected identifier");
 
     return next_token;
 }
 
-// static struct qxc_token* qxc_parser_expect_operator(Parser* parser,
+// static Token* qxc_parser_expect_operator(Parser* parser,
 //                                                     Operator expected_op)
 // {
-//     struct qxc_token* next_token = pop_next_token(parser);
+//     Token* next_token = pop_next_token(parser);
 //
 //     EXPECT(
-//         next_token && next_token->type == OPERATOR_TOKEN && next_token->op ==
+//         next_token && next_token->type == TokenType::Operator && next_token->op ==
 //         expected_op, "Expected operator");
 //
 //     return next_token;
@@ -187,18 +186,18 @@ static struct ExprNode* qxc_parse_factor(Parser* parser)
 {
     auto factor = qxc_malloc<struct ExprNode>(parser->pool);
 
-    struct qxc_token* next_token = pop_next_token(parser);
+    Token* next_token = pop_next_token(parser);
     EXPECT_(next_token);
 
     switch (next_token->type) {
-        case INTEGER_LITERAL_TOKEN:
+        case TokenType::IntLiteral:
             debug_print("parsed integer literal factor: %ld",
                         next_token->int_literal_value);
             factor->type = ExprType::IntLiteral;
             factor->literal = next_token->int_literal_value;
             break;
 
-        case OPERATOR_TOKEN:
+        case TokenType::Operator:
             EXPECT(qxc_operator_can_be_unary(next_token->op),
                    "non-unary operator in unary operator context: %s",
                    qxc_operator_to_str(next_token->op));
@@ -209,20 +208,20 @@ static struct ExprNode* qxc_parse_factor(Parser* parser)
                    "Failed to parse child expression of unary operator");
             break;
 
-        case OPEN_PAREN_TOKEN:
+        case TokenType::OpenParen:
             debug_print("attempting to parse paren closed expression...");
             factor = qxc_parse_expression(parser);
 
             EXPECT(factor, "failed to parse paren-closed expression");
 
-            EXPECT(qxc_parser_expect_token_type(parser, CLOSE_PAREN_TOKEN),
+            EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseParen),
                    "Missing close parenthesis after enclosed factor");
 
             debug_print("found close paren for enclosed expression");
 
             break;
 
-        case IDENTIFIER_TOKEN:
+        case TokenType::Identifier:
             factor->type = ExprType::VariableRef;
             factor->referenced_var_name = next_token->name;
             break;
@@ -299,10 +298,10 @@ static bool binop_valid_for_logical_or_expr_or_below(Operator op)
 static struct ExprNode* qxc_parse_logical_or_expr_(Parser* parser, ExprNode* left_factor,
                                                    int min_precedence)
 {
-    struct qxc_token* next_token = peek_next_token(parser);
+    Token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
-    while (next_token->type == OPERATOR_TOKEN &&
+    while (next_token->type == TokenType::Operator &&
            binop_valid_for_logical_or_expr_or_below(next_token->op)) {
         EXPECT(next_token->op != Operator::Assignment,
                "assignment operator in invalid place!");
@@ -343,7 +342,7 @@ static struct ExprNode* qxc_parse_conditional_expression(Parser* parser,
 {
     struct ExprNode* lor_expr = qxc_parse_logical_or_expr(parser, left_factor);
 
-    struct qxc_token* next_token = peek_next_token(parser);
+    Token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
     if (next_token->op == Operator::QuestionMark) {
@@ -369,7 +368,7 @@ static struct ExprNode* qxc_parse_expression(Parser* parser)
     struct ExprNode* left_factor = qxc_parse_factor(parser);
     EXPECT_(left_factor);
 
-    struct qxc_token* next_token = peek_next_token(parser);
+    Token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
 
     // assignment operator is right-associative, so special treatment here
@@ -393,13 +392,13 @@ static struct ExprNode* qxc_parse_expression(Parser* parser)
 
 static Declaration* qxc_parse_declaration(Parser* parser)
 {
-    struct qxc_token* next_token = pop_next_token(parser);  // pop off int keyword
-    assert(next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::Int);
+    Token* next_token = pop_next_token(parser);  // pop off int keyword
+    assert(next_token->type == TokenType::KeyWord && next_token->keyword == Keyword::Int);
 
     Declaration* new_declaration = alloc_empty_declaration_node(parser);
 
     next_token = pop_next_token(parser);  // pop off identifier
-    EXPECT(next_token && next_token->type == IDENTIFIER_TOKEN,
+    EXPECT(next_token && next_token->type == TokenType::Identifier,
            "Invalid identifier found for variable declaration name");
 
     debug_print("parsing declaration of int var: %s", next_token->name);
@@ -410,14 +409,14 @@ static Declaration* qxc_parse_declaration(Parser* parser)
 
     next_token = peek_next_token(parser);
 
-    if (next_token && next_token->type == OPERATOR_TOKEN &&
+    if (next_token && next_token->type == TokenType::Operator &&
         next_token->op == Operator::Assignment) {
         pop_next_token(parser);  // pop off '='
         new_declaration->initializer_expr = qxc_parse_expression(parser);
         EXPECT(new_declaration->initializer_expr, "Failed to parse variable initializer");
     }
 
-    EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
+    EXPECT(qxc_parser_expect_token_type(parser, TokenType::SemiColon),
            "Missing semicolon at end of declaration");
 
     return new_declaration;
@@ -427,20 +426,22 @@ static BlockItemNode* qxc_parse_block_item(Parser* parser);
 
 static StatementNode* qxc_parse_statement(Parser* parser)
 {
-    struct qxc_token* next_token = peek_next_token(parser);
+    Token* next_token = peek_next_token(parser);
 
     StatementNode* statement = alloc_empty_statement(parser);
 
-    if (next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::Return) {
+    if (next_token->type == TokenType::KeyWord &&
+        next_token->keyword == Keyword::Return) {
         pop_next_token(parser);  // pop off return keyword
         statement->type = StatementType::Return;
         statement->return_expr = qxc_parse_expression(parser);
         EXPECT(statement->return_expr, "Expression parsing failed");
 
-        EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
+        EXPECT(qxc_parser_expect_token_type(parser, TokenType::SemiColon),
                "Missing semicolon at end of statement");
     }
-    else if (next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::If) {
+    else if (next_token->type == TokenType::KeyWord &&
+             next_token->keyword == Keyword::If) {
         (void)pop_next_token(parser);  // pop off 'if' keyword
         statement->type = StatementType::IfElse;
 
@@ -453,27 +454,27 @@ static StatementNode* qxc_parse_statement(Parser* parser)
 
         next_token = peek_next_token(parser);
 
-        if (next_token && next_token->type == KEYWORD_TOKEN &&
+        if (next_token && next_token->type == TokenType::KeyWord &&
             next_token->keyword == Keyword::Else) {
             (void)pop_next_token(parser);  // pop off 'else' keyword
             ifelse_stmt->else_branch_statement = qxc_parse_statement(parser);
             EXPECT_(ifelse_stmt->else_branch_statement);
         }
     }
-    else if (next_token->type == OPEN_BRACE_TOKEN) {
+    else if (next_token->type == TokenType::OpenBrace) {
         (void)pop_next_token(parser);  // pop off 'if' keyword
         statement->type = StatementType::Compound;
 
         // TODO: abstract out to parse_block_item_list
         statement->compound_statement_block_items = array_create<BlockItemNode*>(4);
-        while (peek_next_token(parser)->type != CLOSE_BRACE_TOKEN) {
+        while (peek_next_token(parser)->type != TokenType::CloseBrace) {
             BlockItemNode* next_block_item = qxc_parse_block_item(parser);
             EXPECT(next_block_item, "Failed to parse block item in function: main");
             array_extend(&statement->compound_statement_block_items, next_block_item);
             debug_print("successfully parsed block item");
         }
 
-        EXPECT(qxc_parser_expect_token_type(parser, CLOSE_BRACE_TOKEN),
+        EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseBrace),
                "Missing closing brace at end of compound statement");
     }
     else {
@@ -488,7 +489,7 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         statement->type = StatementType::StandAloneExpr;
         statement->standalone_expr = standalone_expression;
 
-        EXPECT(qxc_parser_expect_token_type(parser, SEMICOLON_TOKEN),
+        EXPECT(qxc_parser_expect_token_type(parser, TokenType::SemiColon),
                "Missing semicolon at end of statement");
     }
 
@@ -497,12 +498,12 @@ static StatementNode* qxc_parse_statement(Parser* parser)
 
 static BlockItemNode* qxc_parse_block_item(Parser* parser)
 {
-    struct qxc_token* next_token = peek_next_token(parser);
+    Token* next_token = peek_next_token(parser);
     EXPECT(next_token, "Expected another block item here!");
 
     BlockItemNode* block_item = alloc_empty_block_item(parser);
 
-    if (next_token->type == KEYWORD_TOKEN && next_token->keyword == Keyword::Int) {
+    if (next_token->type == TokenType::KeyWord && next_token->keyword == Keyword::Int) {
         block_item->type = BlockItemType::Declaration;
         block_item->declaration = qxc_parse_declaration(parser);
         EXPECT_(block_item->declaration);
@@ -523,28 +524,28 @@ static FunctionDecl* qxc_parse_function_decl(Parser* parser)
 
     EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");
 
-    EXPECT(qxc_parser_expect_token_type(parser, OPEN_PAREN_TOKEN),
+    EXPECT(qxc_parser_expect_token_type(parser, TokenType::OpenParen),
            "Missing open parenthesis");
 
     // arg parsing would go here, if we allowed function arguments yet
 
-    EXPECT(qxc_parser_expect_token_type(parser, CLOSE_PAREN_TOKEN),
+    EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseParen),
            "Missing close parenthesis");
 
-    EXPECT(qxc_parser_expect_token_type(parser, OPEN_BRACE_TOKEN),
+    EXPECT(qxc_parser_expect_token_type(parser, TokenType::OpenBrace),
            "Missing open brace token");
 
     FunctionDecl* decl = alloc_empty_function_decl(parser);
     decl->name = "main";
 
-    while (peek_next_token(parser)->type != CLOSE_BRACE_TOKEN) {
+    while (peek_next_token(parser)->type != TokenType::CloseBrace) {
         BlockItemNode* next_block_item = qxc_parse_block_item(parser);
         EXPECT(next_block_item, "Failed to parse block item in function: main");
         array_extend(&decl->blist, next_block_item);
         debug_print("successfully parsed block item");
     }
 
-    EXPECT(qxc_parser_expect_token_type(parser, CLOSE_BRACE_TOKEN),
+    EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseBrace),
            "Missing close brace token at end of function: main");
 
     return decl;

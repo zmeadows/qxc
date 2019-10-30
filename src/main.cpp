@@ -110,7 +110,7 @@ static void qxc_context_deinit(struct qxc_context* ctx) { rm_tmp_dir(ctx->work_d
 static int qxc_context_run(const struct qxc_context* ctx)
 {
     if (ctx->mode == TOKENIZE_MODE) {
-        auto tokens = array_create<struct qxc_token>(256);
+        auto tokens = array_create<Token>(256);
         defer { array_destroy(&tokens); };
         if (qxc_tokenize(&tokens, ctx->canonical_input_filepath) != 0) {
             fprintf(stderr, "lexure failure\n");

@@ -3,12 +3,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "darray.h"
-
 enum class Keyword { Return, Int, If, Else, Invalid };
 
-const char* qxc_keyword_to_str(Keyword keyword);
-Keyword qxc_str_to_keyword(const char* kstr);
+const char* keyword_to_str(Keyword keyword);
+Keyword str_to_keyword(const char* kstr);
 
 enum class Operator {
     Minus,
@@ -43,21 +41,21 @@ const char* qxc_operator_to_str(Operator op);
 bool qxc_operator_can_be_unary(Operator op);
 bool qxc_operator_is_always_unary(Operator op);
 
-enum qxc_token_type {
-    CLOSE_BRACE_TOKEN,
-    CLOSE_PAREN_TOKEN,
-    IDENTIFIER_TOKEN,
-    INTEGER_LITERAL_TOKEN,
-    KEYWORD_TOKEN,
-    OPEN_BRACE_TOKEN,
-    OPEN_PAREN_TOKEN,
-    OPERATOR_TOKEN,
-    SEMICOLON_TOKEN,
-    INVALID_TOKEN
+enum class TokenType {
+    CloseBrace,
+    CloseParen,
+    Identifier,
+    IntLiteral,
+    KeyWord,
+    OpenBrace,
+    OpenParen,
+    Operator,
+    SemiColon,
+    Invalid
 };
 
-struct qxc_token {
-    enum qxc_token_type type;
+struct Token {
+    TokenType type;
     int line;
     int column;
 
@@ -69,5 +67,5 @@ struct qxc_token {
     };
 };
 
-void qxc_token_print(struct qxc_token* token);
+void qxc_token_print(Token* token);
 

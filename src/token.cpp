@@ -7,7 +7,7 @@
 #include "darray.h"
 #include "prelude.h"
 
-const char* qxc_keyword_to_str(Keyword keyword)
+const char* keyword_to_str(Keyword keyword)
 {
     switch (keyword) {
         case Keyword::Return:
@@ -23,7 +23,7 @@ const char* qxc_keyword_to_str(Keyword keyword)
     }
 }
 
-Keyword qxc_str_to_keyword(const char* kstr)
+Keyword str_to_keyword(const char* kstr)
 {
     if (strs_are_equal("return", kstr)) {
         return Keyword::Return;
@@ -112,36 +112,36 @@ bool qxc_operator_is_always_unary(Operator op)
     }
 }
 
-void qxc_token_print(struct qxc_token* token)
+void qxc_token_print(Token* token)
 {
     printf("%d:%d ", token->line, token->column);
 
     switch (token->type) {
-        case OPEN_BRACE_TOKEN:
+        case TokenType::OpenBrace:
             printf("{");
             break;
-        case CLOSE_BRACE_TOKEN:
+        case TokenType::CloseBrace:
             printf("}");
             break;
-        case OPEN_PAREN_TOKEN:
+        case TokenType::OpenParen:
             printf("(");
             break;
-        case CLOSE_PAREN_TOKEN:
+        case TokenType::CloseParen:
             printf(")");
             break;
-        case SEMICOLON_TOKEN:
+        case TokenType::SemiColon:
             printf(";");
             break;
-        case KEYWORD_TOKEN:
-            printf("keyword: %s", qxc_keyword_to_str(token->keyword));
+        case TokenType::KeyWord:
+            printf("keyword: %s", keyword_to_str(token->keyword));
             break;
-        case IDENTIFIER_TOKEN:
+        case TokenType::Identifier:
             printf("identifier: %s", token->name);
             break;
-        case INTEGER_LITERAL_TOKEN:
+        case TokenType::IntLiteral:
             printf("integer literal: %ld", token->int_literal_value);
             break;
-        case OPERATOR_TOKEN:
+        case TokenType::Operator:
             printf("operator: %s", qxc_operator_to_str(token->op));
             break;
         default:

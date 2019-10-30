@@ -15,7 +15,7 @@
 
 #define QXC_MAXIMUM_IDENTIFIER_LENGTH 256
 
-struct qxc_tokenizer {
+struct Tokenizer {
     // TODO: store identifiers in a hash set/table and use one pointer per identifier
     // maybe table of const char* -> list of all locations of identifier/keyword?
     char id[QXC_MAXIMUM_IDENTIFIER_LENGTH];
@@ -27,7 +27,7 @@ struct qxc_tokenizer {
     char next_char;
 };
 
-static int qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* filepath)
+static int qxc_tokenizer_init(Tokenizer* tokenizer, const char* filepath)
 {
     FILE* f = fopen(filepath, "r");
 
@@ -64,12 +64,9 @@ static int qxc_tokenizer_init(struct qxc_tokenizer* tokenizer, const char* filep
     return 0;
 }
 
-static void qxc_tokenizer_free(struct qxc_tokenizer* tokenizer)
-{
-    free(tokenizer->contents);
-}
+static void qxc_tokenizer_free(Tokenizer* tokenizer) { free(tokenizer->contents); }
 
-static void qxc_tokenizer_advance(struct qxc_tokenizer* tokenizer)
+static void qxc_tokenizer_advance(Tokenizer* tokenizer)
 {
     tokenizer->next_char_ptr++;
     tokenizer->next_char = *tokenizer->next_char_ptr;
@@ -77,7 +74,7 @@ static void qxc_tokenizer_advance(struct qxc_tokenizer* tokenizer)
 }
 
 // TODO remove?
-static inline void qxc_tokenizer_grow_id_buffer(struct qxc_tokenizer* tokenizer)
+static inline void qxc_tokenizer_grow_id_buffer(Tokenizer* tokenizer)
 {
     tokenizer->id[tokenizer->id_len] = tokenizer->next_char;
     tokenizer->id_len++;
@@ -162,7 +159,7 @@ static inline bool is_valid_keyword_identifier_trailing_character(char c)
 
 // FIXME: need separate functions for consuming different types of
 // literals/identifiers
-static void qxc_tokenizer_consume_id(struct qxc_tokenizer* tokenizer)
+static void qxc_tokenizer_consume_id(Tokenizer* tokenizer)
 {
     tokenizer->id[0] = '\0';
     tokenizer->id_len = 0;
@@ -185,65 +182,65 @@ static inline bool is_valid_symbol(char c)
     return c != '\0' && strchr("{}();", c) != NULL;
 }
 
-static void qxc_build_symbol_token(struct qxc_tokenizer* tokenizer,
-                                   array<struct qxc_token>* token_buffer, char c)
+static void qxc_build_symbol_token(Tokenizer* tokenizer, array<Token>* token_buffer,
+                                   char c)
 {
-    struct qxc_token* new_token = array_extend(token_buffer);
+    Token* new_token = array_extend(token_buffer);
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
 
     switch (c) {
         case '{':
-            new_token->type = OPEN_BRACE_TOKEN;
+            new_token->type = TokenType::OpenBrace;
             break;
         case '}':
-            new_token->type = CLOSE_BRACE_TOKEN;
+            new_token->type = TokenType::CloseBrace;
             break;
         case '(':
-            new_token->type = OPEN_PAREN_TOKEN;
+            new_token->type = TokenType::OpenParen;
             break;
         case ')':
-            new_token->type = CLOSE_PAREN_TOKEN;
+            new_token->type = TokenType::CloseParen;
             break;
         case ';':
-            new_token->type = SEMICOLON_TOKEN;
+            new_token->type = TokenType::SemiColon;
             break;
         default:
-            new_token->type = INVALID_TOKEN;
+            new_token->type = TokenType::Invalid;
             break;
     }
 }
 
-static inline void qxc_consume_symbol_token(struct qxc_tokenizer* tokenizer,
-                                            array<struct qxc_token>* token_buffer)
+static inline void qxc_consume_symbol_token(Tokenizer* tokenizer,
+                                            array<Token>* token_buffer)
 {
     qxc_build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
     qxc_tokenizer_advance(tokenizer);
 }
 
-static void qxc_build_operator_token(struct qxc_tokenizer* tokenizer,
-                                     array<struct qxc_token>* token_buffer, Operator op)
+static void qxc_build_operator_token(Tokenizer* tokenizer, array<Token>* token_buffer,
+                                     Operator op)
 {
-    struct qxc_token* new_token = array_extend(token_buffer);
-    new_token->type = OPERATOR_TOKEN;
+    Token* new_token = array_extend(token_buffer);
+    new_token->type = TokenType::Operator;
     new_token->op = op;
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
 }
 
 // 'consume' == build + advance tokenizer
-static void qxc_consume_operator_token(struct qxc_tokenizer* tokenizer,
-                                       array<struct qxc_token>* token_buffer, Operator op)
+static void qxc_consume_operator_token(Tokenizer* tokenizer, array<Token>* token_buffer,
+                                       Operator op)
 {
     qxc_build_operator_token(tokenizer, token_buffer, op);
     qxc_tokenizer_advance(tokenizer);
 }
 
-int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath)
+int qxc_tokenize(array<Token>* token_buffer, const char* filepath)
 {
     array_clear(token_buffer);
 
-    struct qxc_tokenizer tokenizer;
+    Tokenizer tokenizer;
 
     if (qxc_tokenizer_init(&tokenizer, filepath) != 0) {
         debug_print("failed to initializer tokenizer");
@@ -254,19 +251,19 @@ int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath)
         if (is_valid_keyword_identifier_first_character(tokenizer.next_char)) {
             qxc_tokenizer_consume_id(&tokenizer);
 
-            struct qxc_token* new_token = array_extend(token_buffer);
+            Token* new_token = array_extend(token_buffer);
 
-            Keyword keyword = qxc_str_to_keyword(tokenizer.id);
+            Keyword keyword = str_to_keyword(tokenizer.id);
 
             if (keyword == Keyword::Invalid) {
                 // it's an identifier, not a keyword
-                new_token->type = IDENTIFIER_TOKEN;
+                new_token->type = TokenType::Identifier;
 
                 // TODO: bounds check identifier length
                 memcpy(new_token->name, tokenizer.id, (size_t)tokenizer.id_len + 1);
             }
             else {  // it's a built in keyword
-                new_token->type = KEYWORD_TOKEN;
+                new_token->type = TokenType::KeyWord;
                 new_token->keyword = keyword;
             }
 
@@ -329,8 +326,8 @@ int qxc_tokenize(array<struct qxc_token>* token_buffer, const char* filepath)
                 return -1;
             }
 
-            struct qxc_token* new_token = array_extend(token_buffer);
-            new_token->type = INTEGER_LITERAL_TOKEN;
+            Token* new_token = array_extend(token_buffer);
+            new_token->type = TokenType::IntLiteral;
             new_token->line = tokenizer.current_line;
             new_token->column = tokenizer.current_column - tokenizer.id_len;
             new_token->int_literal_value = maybe_value;

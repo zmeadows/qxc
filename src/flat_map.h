@@ -1,6 +1,6 @@
 #pragma once
 
-/*
+namespace {
 
 template <typename T>
 inline constexpr bool is_power_of_two(T n)
@@ -8,8 +8,57 @@ inline constexpr bool is_power_of_two(T n)
     return (n & (n - 1)) == 0;
 }
 
-template <typename K, typename V, typename HashFunc, typename CmpFunc, K EmptySentinel,
-          K TombstoneSentinel>
+template <typename T>
+uint8_t* raw_alloc(size_t count)
+{
+    return reinterpret_cast<uint8_t*>(aligned_alloc(alignof(T), sizeof(T) * count));
+}
+
+template <typename T>
+struct DefaultSentinels {
+    static_assert(
+        sizeof(T) == -1,
+        "Default sentinels don't exist for this key type, use custom implementation!");
+    static T empty;
+    static T tombstone;
+};
+
+template <typename T>
+struct DefaultSentinels<T*> {
+    static T* empty = (T*)0x0;
+    static T* tombstone = (T*)0x1;
+};
+
+template <typename T>
+struct DefaultHasher {
+    static_assert(
+        sizeof(T) == -1,
+        "Default Hasher doesn't exist for this key type, use custom implementation!");
+    uint64_t hash(T key);
+};
+
+// pointer hashing
+template <typename T>
+struct DefaultHasher<T*> {
+    uint64_t hash(T* key_ptr)
+    {
+        auto key = reinterpret_cast<uintptr_t>(key_ptr);
+        key = (~key) + (key << 21);  // key = (key << 21) - key - 1;
+        key = key ^ (key >> 24);
+        key = (key + (key << 3)) + (key << 8);  // key * 265
+        key = key ^ (key >> 14);
+        key = (key + (key << 2)) + (key << 4);  // key * 21
+        key = key ^ (key >> 28);
+        key = key + (key << 31);
+        return static_cast<uint64_t>(key);
+    }
+};
+
+}  // namespace
+
+template <typename K, typename V, class Hasher = DefaultHasher<K>,
+          K EMPTY_SENTINEL = DefaultSentinels<K>::empty,
+          K TOMBSTONE_SENTINEL = DefaultSentinels<K>::tombstone>
 class DenseHashTable {
     uint8_t* m_keys;
     uint8_t* m_values;
@@ -18,66 +67,117 @@ class DenseHashTable {
     size_t m_longest_probe;
     double m_max_load_factor;
 
-public:
-    EntityMap(size_t initial_capacity)
-        : keys((K*)malloc(sizeof(K) * initial_capacity)),
-          values((V*)malloc(sizeof(V) * initial_capacity)),
-          count(0),
-          capacity(initial_capacity),
-          longest_probe(0),
-          max_load_factor(0.5)
+    inline K* cast_keys(void) { return reinterpret_cast<K*>(m_keys); }
+    inline V* cast_values(void) { return reinterpret_cast<V*>(m_values); }
+
+    void rehash(size_t new_capacity)
     {
-        ARK_ASSERT(initial_capacity > 0, "initial capacity must be greater than 0.");
-        ARK_ASSERT(detail::is_power_of_two(initial_capacity),
-                   "capacity must always be a power of two!");
-        ARK_ASSERT(keys, "Failed to initialize memory for EntityMap keys");
-        ARK_ASSERT(values, "Failed to initialize memory for EntityMap values");
+        assert(new_capacity > m_capacity);
+        assert(is_power_of_two(new_capacity));
 
-        for (size_t i = 0; i < capacity; i++) {
-            keys[i] = EMPTY_SENTINEL;
-        }
-    }
+        DenseHashTable new_table(new_capacity);
 
-    EntityMap() : EntityMap(64) {}
+        // TODO: just keep these as a class member?
+        K* keys = this->cast_keys();
+        V* values = this->cast_values();
 
-    EntityMap& operator=(const EntityMap&) = delete;
-    EntityMap& operator=(EntityMap&&) = delete;
-    EntityMap(EntityMap&&) = delete;
-    EntityMap(const EntityMap&) = delete;
-
-    ~EntityMap(void)
-    {
-        for (size_t i = 0; i < capacity; i++) {
-            const K id = keys[i];
-            if (id != EMPTY_SENTINEL && id != TOMBSTONE_SENTINEL) {
-                values[i].~V();
+        for (size_t i = 0; i < m_capacity; i++) {
+            const K& k = keys[i];
+            if (k != EMPTY_SENTINEL && k != TOMBSTONE_SENTINEL) {
+                new_table.insert(k, std::move(values[i]));
             }
         }
 
-        free(keys);
-        free(values);
-        keys = nullptr;
-        values = nullptr;
-        count = 0;
-        capacity = 0;
-        longest_probe = 0;
+        assert(m_count == new_table.m_count);
+        std::swap(m_keys, new_table.m_keys);
+        std::swap(m_values, new_table.m_values);
+        std::swap(m_capacity, new_table.m_capacity);
+        std::swap(m_longest_probe, new_table.m_longest_probe);
     }
 
-    inline double load_factor(Self* table)
+public:
+    // TODO: write nearest_power_of_two function so user can't screw up initial capacity
+    DenseHashTable(size_t initial_capacity)
+        : m_keys(raw_alloc<K>(initial_capacity)),
+          m_values(raw_alloc<V>(initial_capacity)),
+          m_count(0),
+          m_capacity(initial_capacity),
+          m_longest_probe(0),
+          m_max_load_factor(0.5)
     {
-        return static_cast<double>(table->count) / static_cast<double>(table->capacity);
+        assert(initial_capacity > 0);
+        assert(is_power_of_two(initial_capacity));
+        assert(m_keys);
+        assert(m_values);
+
+        K* keys_cast = this->cast_keys();
+
+        for (size_t i = 0; i < m_capacity; i++) {
+            keys_cast[i] = EMPTY_SENTINEL;
+        }
     }
 
-    inline size_t size(void) const { return count; }
+    DenseHashTable() : DenseHashTable(8) {}
+
+    DenseHashTable& operator=(const DenseHashTable&) = delete;
+    DenseHashTable& operator=(DenseHashTable&&) = delete;
+    DenseHashTable(DenseHashTable&&) = delete;
+    DenseHashTable(const DenseHashTable&) = delete;
+
+    ~DenseHashTable(void)
+    {
+        K* keys_cast = this->cast_keys();
+        V* values_cast = this->cast_values();
+
+        for (size_t i = 0; i < m_capacity; i++) {
+            K& key = keys_cast[i];
+            if (key != EMPTY_SENTINEL && key != TOMBSTONE_SENTINEL) {
+                values_cast[i].~V();
+            }
+            key.~K();
+        }
+
+        free(m_keys);
+        free(m_values);
+        m_keys = nullptr;
+        m_values = nullptr;
+        m_count = 0;
+        m_capacity = 0;
+        m_longest_probe = 0;
+    }
+
+    V& operator[](K id)
+    {
+        V* result = lookup(id);
+        assert(result != nullptr);
+        return *result;
+    }
+
+    const V& operator[](K id) const
+    {
+        const V* result = lookup(id);
+        assert(result != nullptr);
+        return *result;
+    }
+
+    inline double load_factor(void)
+    {
+        return static_cast<double>(m_count) / static_cast<double>(m_capacity);
+    }
+
+    inline size_t size(void) const { return m_count; }
 
     V* lookup(K lookup_id) const
     {
-        const uint64_t N = capacity - 1;
-        uint32_t probe_index = detail::hash_id(lookup_id) & N;
-        uint64_t distance_froinitial_bucket = 0;
+        const uint64_t N = m_capacity - 1;
+        uint64_t probe_index = Hasher::hash(lookup_id) & N;
+        uint64_t distance_from_initial_bucket = 0;
+
+        K* keys = this->cast_keys();
+        V* values = this->cast_values();
 
         while (true) {
-            const K probed_id = keys[probe_index];
+            const K& probed_id = keys[probe_index];
 
             if (probed_id == lookup_id) {
                 return values + probe_index;
@@ -87,50 +187,51 @@ public:
             }
 
             probe_index = (probe_index + 1) & N;
-            distance_froinitial_bucket++;
+            distance_from_initial_bucket++;
 
-            if (distance_froinitial_bucket > longest_probe) {
+            if (distance_from_initial_bucket > m_longest_probe) {
                 return nullptr;
             }
         }
     }
 
     template <typename... Args>
-    V* insert(K new_id, Args&&... args)
+    V* insert(K new_key, Args&&... args)
     {
-        if (load_factor() > max_load_factor) {
-            rehash(capacity * 2);
+        if (load_factor() > m_max_load_factor) {
+            rehash(m_capacity * 2);
         }
 
-        const uint64_t N = capacity - 1;
-        uint32_t probe_index = detail::hash_id(new_id) & N;
-
+        const uint64_t N = m_capacity - 1;
+        uint64_t probe_index = Hasher::hash(new_key) & N;
         uint64_t dib = 0;  // 'd'istance from 'i'nitial 'b'ucket
 
         V new_value(std::forward<Args>(args)...);
+
+        K* keys = this->cast_keys();
+        V* values = this->cast_values();
 
         while (true) {
             K& probed_id = keys[probe_index];
 
             if (probed_id == TOMBSTONE_SENTINEL || probed_id == EMPTY_SENTINEL) {
-                probed_id = new_id;
+                probed_id = new_key;
                 std::swap(new_value, values[probe_index]);
-                count++;
-                longest_probe = dib > longest_probe ? dib : longest_probe;
+                m_count++;
+                m_longest_probe = dib > m_longest_probe ? dib : m_longest_probe;
                 return values + probe_index;
             }
-            else if (probed_id == new_id) {
+            else if (probed_id == new_key) {
                 std::swap(values[probe_index], new_value);
                 return values + probe_index;
             }
             else {
                 // TODO: is this handling wrap-around properly?
-                const uint64_t probed_dib =
-                    probe_index - (detail::hash_id(probed_id) & N);
+                const uint64_t probed_dib = probe_index - (Hasher::hash(probed_id) & N);
                 if (probed_dib < dib) {
-                    std::swap(probed_id, new_id);
+                    std::swap(probed_id, new_key);
                     std::swap(values[probe_index], new_value);
-                    longest_probe = dib > longest_probe ? dib : longest_probe;
+                    m_longest_probe = dib > m_longest_probe ? dib : m_longest_probe;
                     dib = probed_dib;
                 }
             }
@@ -142,10 +243,12 @@ public:
 
     bool remove(K id)
     {
-        const uint64_t N = capacity - 1;
-        uint64_t probe_index = detail::hash_id(id) & N;
-
+        const uint64_t N = m_capacity - 1;
+        uint64_t probe_index = Hasher::hash(id) & N;
         uint64_t dib = 0;
+
+        K* keys = this->cast_keys();
+        V* values = this->cast_values();
 
         while (true) {
             K& probed_id = keys[probe_index];
@@ -153,7 +256,7 @@ public:
             if (probed_id == id) {
                 probed_id = TOMBSTONE_SENTINEL;
                 values[probe_index].~V();
-                count--;
+                m_count--;
                 return true;
             }
             else if (probed_id == EMPTY_SENTINEL) {
@@ -163,48 +266,9 @@ public:
             probe_index = (probe_index + 1) & N;
             dib++;
 
-            if (dib > longest_probe) {
+            if (dib > m_longest_probe) {
                 return false;
             }
         }
     }
-
-    void rehash(size_t new_capacity)
-    {
-        assert(new_capacity > capacity);
-
-        assert(detail::is_power_of_two(new_capacity) &&
-               "EntityMap: Table capacity must be a power of two!");
-
-        EntityMap new_table(new_capacity);
-
-        for (size_t i = 0; i < capacity; i++) {
-            K id = keys[i];
-            if (id != EMPTY_SENTINEL && id != TOMBSTONE_SENTINEL) {
-                new_table.insert(id, std::move(values[i]));
-            }
-        }
-
-        std::swap(keys, new_table.keys);
-        std::swap(values, new_table.values);
-        std::swap(capacity, new_table.capacity);
-        std::swap(longest_probe, new_table.longest_probe);
-    }
-
-    V& operator[](K id)
-    {
-        V* result = lookup(id);
-        ARK_ASSERT(result != nullptr,
-                   "EntityMap: Called operator[] with non-existent K!");
-        return *result;
-    }
-
-    const V& operator[](K id) const
-    {
-        const V* result = lookup(id);
-        ARK_ASSERT(result != nullptr,
-                   "EntityMap: Called operator[] with non-existent K: " << id);
-        return *result;
-    }
 };
-*/

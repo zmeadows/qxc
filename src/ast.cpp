@@ -34,15 +34,8 @@ struct Parser {
     DynArray<Token> token_buffer;
     size_t itoken;
 
-    static Parser create(void)
-    {
-        Parser parser;
-
-        parser.pool = qxc_memory_pool_init(1e3);
-        parser.itoken = 0;
-
-        return parser;
-    }
+    // TODO: remove memory pool from Parser struct
+    Parser(void) : pool(qxc_memory_pool_init(1e3)), itoken(0) {}
 };
 
 #define EXPECT(EXPR, ...)                                                  \
@@ -502,7 +495,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
 Program* parse_program(const char* filepath)
 {
-    Parser parser = Parser::create();
+    Parser parser;
 
     if (tokenize(&parser.token_buffer, filepath) != 0) {
         return nullptr;

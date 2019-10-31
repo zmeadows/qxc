@@ -27,6 +27,11 @@ public:
 
     DynArray(void) : DynArray(0) {}
 
+    // DynArray& operator=(const DynArray&) = delete;
+    // DynArray& operator=(DynArray&&) = delete;
+    // DynArray(DynArray&&) = delete;
+    // DynArray(const DynArray&) = delete;
+
     ~DynArray(void)
     {
         this->clear();

@@ -62,44 +62,6 @@ struct Parser {
         }                   \
     } while (0)
 
-// TODO: remove all this alloc_* functions
-static inline struct ExprNode* alloc_empty_expression(Parser* parser)
-{
-    auto expr = qxc_malloc<struct ExprNode>(parser->pool);
-    expr->type = ExprType::Invalid;
-    return expr;
-}
-
-static inline BlockItemNode* alloc_empty_block_item(Parser* parser)
-{
-    auto block_item = qxc_malloc<BlockItemNode>(parser->pool);
-    block_item->type = BlockItemType::Invalid;
-    return block_item;
-}
-
-static inline StatementNode* alloc_empty_statement(Parser* parser)
-{
-    auto statement = qxc_malloc<StatementNode>(parser->pool);
-    statement->type = StatementType::Invalid;
-    return statement;
-}
-
-static inline Declaration* alloc_empty_declaration_node(Parser* parser)
-{
-    auto decl = qxc_malloc<Declaration>(parser->pool);
-    decl->var_name = nullptr;
-    decl->initializer_expr = nullptr;
-    return decl;
-}
-
-static inline FunctionDecl* alloc_empty_function_decl(Parser* parser)
-{
-    auto decl = qxc_malloc<FunctionDecl>(parser->pool);
-    decl->name = nullptr;
-
-    return decl;
-}
-
 // static void rewind_token_buffer(Parser* parser, size_t count)
 // {
 //     while (count > 0 && parser->itoken > 0) {
@@ -306,7 +268,7 @@ static struct ExprNode* parse_logical_or_expr_(Parser* parser, ExprNode* left_fa
             parse_logical_or_expr_(parser, parse_factor(parser), next_op_precedence);
         EXPECT_(right_expr);
 
-        struct ExprNode* new_expr = alloc_empty_expression(parser);
+        ExprNode* new_expr = qxc_malloc<ExprNode>(parser->pool);
         new_expr->type = ExprType::BinaryOp;
         new_expr->binop_expr.op = next_token->op;
         new_expr->binop_expr.left_expr = left_factor;
@@ -338,7 +300,7 @@ static struct ExprNode* parse_conditional_expression(Parser* parser,
     if (next_token->op == Operator::QuestionMark) {
         (void)pop_next_token(parser);
 
-        struct ExprNode* ternary_expr = alloc_empty_expression(parser);
+        struct ExprNode* ternary_expr = qxc_malloc<ExprNode>(parser->pool);
         ternary_expr->type = ExprType::Conditional;
         ternary_expr->cond_expr.conditional_expr = lor_expr;
         ternary_expr->cond_expr.if_expr = parse_expression(parser);
@@ -367,7 +329,7 @@ static struct ExprNode* parse_expression(Parser* parser)
                "left hand side of assignment operator must be a variable reference!");
         (void)pop_next_token(parser);
 
-        struct ExprNode* assign_expr = alloc_empty_expression(parser);
+        struct ExprNode* assign_expr = qxc_malloc<ExprNode>(parser->pool);
         assign_expr->type = ExprType::BinaryOp;
         assign_expr->binop_expr.op = Operator::Assignment;
         assign_expr->binop_expr.left_expr = left_factor;
@@ -385,7 +347,7 @@ static Declaration* parse_declaration(Parser* parser)
     Token* next_token = pop_next_token(parser);  // pop off int keyword
     assert(next_token->type == TokenType::KeyWord && next_token->keyword == Keyword::Int);
 
-    Declaration* new_declaration = alloc_empty_declaration_node(parser);
+    Declaration* new_declaration = qxc_malloc<Declaration>(parser->pool);
 
     next_token = pop_next_token(parser);  // pop off identifier
     EXPECT(next_token && next_token->type == TokenType::Identifier,
@@ -418,7 +380,7 @@ static StatementNode* parse_statement(Parser* parser)
 {
     Token* next_token = peek_next_token(parser);
 
-    StatementNode* statement = alloc_empty_statement(parser);
+    auto statement = qxc_malloc<StatementNode>(parser->pool);
 
     if (next_token->type == TokenType::KeyWord &&
         next_token->keyword == Keyword::Return) {
@@ -491,7 +453,7 @@ static BlockItemNode* parse_block_item(Parser* parser)
     Token* next_token = peek_next_token(parser);
     EXPECT(next_token, "Expected another block item here!");
 
-    BlockItemNode* block_item = alloc_empty_block_item(parser);
+    BlockItemNode* block_item = qxc_malloc<BlockItemNode>(parser->pool);
 
     if (next_token->type == TokenType::KeyWord && next_token->keyword == Keyword::Int) {
         block_item->type = BlockItemType::Declaration;
@@ -522,7 +484,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
     EXPECT(expect_token_type(parser, TokenType::OpenBrace), "Missing open brace token");
 
-    FunctionDecl* decl = alloc_empty_function_decl(parser);
+    FunctionDecl* decl = qxc_malloc<FunctionDecl>(parser->pool);
     decl->name = "main";
 
     while (peek_next_token(parser)->type != TokenType::CloseBrace) {

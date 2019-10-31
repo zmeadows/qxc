@@ -38,9 +38,9 @@ const char* mk_tmp_dir(void)
 
     const char* tmp_dirname = mkdtemp(_template);
 
-    if (tmp_dirname == NULL) {
+    if (tmp_dirname == nullptr) {
         perror("mkdtemp failed: ");
-        return NULL;
+        return nullptr;
     }
 
     return tmp_dirname;
@@ -60,7 +60,7 @@ void print_file(const char* filepath)
 {
     FILE* fptr = fopen(filepath, "r");
 
-    if (fptr == NULL) {
+    if (fptr == nullptr) {
         fprintf(stderr, "Cannot open file \n");
         return;
     }

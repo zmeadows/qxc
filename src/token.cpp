@@ -19,7 +19,7 @@ const char* keyword_to_str(Keyword keyword)
         case Keyword::Else:
             return "else";
         default:
-            return NULL;
+            return nullptr;
     }
 }
 
@@ -42,7 +42,7 @@ Keyword str_to_keyword(const char* kstr)
     }
 }
 
-const char* qxc_operator_to_str(Operator op)
+const char* operator_to_str(Operator op)
 {
     switch (op) {
         case Operator::Minus:
@@ -80,13 +80,13 @@ const char* qxc_operator_to_str(Operator op)
         case Operator::Assignment:
             return "=";
         default:
-            return NULL;
+            return nullptr;
     }
 }
 
 // TODO: eventually multiply_op will serve as
 // unary pointer dereference operator as well
-bool qxc_operator_can_be_unary(Operator op)
+bool operator_can_be_unary(Operator op)
 {
     switch (op) {
         case Operator::Minus:
@@ -100,7 +100,7 @@ bool qxc_operator_can_be_unary(Operator op)
     }
 }
 
-bool qxc_operator_is_always_unary(Operator op)
+bool operator_is_always_unary(Operator op)
 {
     switch (op) {
         case Operator::LogicalNegation:
@@ -112,11 +112,11 @@ bool qxc_operator_is_always_unary(Operator op)
     }
 }
 
-void qxc_token_print(Token* token)
+void token_print(const Token& token)
 {
-    printf("%d:%d ", token->line, token->column);
+    printf("%d:%d ", token.line, token.column);
 
-    switch (token->type) {
+    switch (token.type) {
         case TokenType::OpenBrace:
             printf("{");
             break;
@@ -133,16 +133,16 @@ void qxc_token_print(Token* token)
             printf(";");
             break;
         case TokenType::KeyWord:
-            printf("keyword: %s", keyword_to_str(token->keyword));
+            printf("keyword: %s", keyword_to_str(token.keyword));
             break;
         case TokenType::Identifier:
-            printf("identifier: %s", token->name);
+            printf("identifier: %s", token.name);
             break;
         case TokenType::IntLiteral:
-            printf("integer literal: %ld", token->int_literal_value);
+            printf("integer literal: %ld", token.int_literal_value);
             break;
         case TokenType::Operator:
-            printf("operator: %s", qxc_operator_to_str(token->op));
+            printf("operator: %s", operator_to_str(token.op));
             break;
         default:
             printf("unrecognized/invalid token type");

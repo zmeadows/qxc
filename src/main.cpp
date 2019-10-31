@@ -47,7 +47,7 @@ static int qxc_context_init(struct qxc_context* ctx, int argc, char* argv[])
         return -1;
     }
 
-    const char* user_specified_input_filepath = NULL;
+    const char* user_specified_input_filepath = nullptr;
 
     for (int i = 1; i < argc; i++) {
         const char* ith_arg = argv[i];
@@ -68,12 +68,13 @@ static int qxc_context_init(struct qxc_context* ctx, int argc, char* argv[])
         }
     }
 
-    if (user_specified_input_filepath == NULL) {
+    if (user_specified_input_filepath == nullptr) {
         fprintf(stderr, "No input file specified in command line arguments.\n");
         return EXIT_FAILURE;
     }
 
-    if (realpath(user_specified_input_filepath, ctx->canonical_input_filepath) == NULL) {
+    if (realpath(user_specified_input_filepath, ctx->canonical_input_filepath) ==
+        nullptr) {
         fprintf(stderr, "Specified file doesn't exist or could not be opened.\n");
         fprintf(stderr, "--> %s\n", user_specified_input_filepath);
         return EXIT_FAILURE;
@@ -91,7 +92,7 @@ static int qxc_context_init(struct qxc_context* ctx, int argc, char* argv[])
     strip_ext(bname);
 
     const char* new_tmp_dir = mk_tmp_dir();
-    if (new_tmp_dir == NULL) {
+    if (new_tmp_dir == nullptr) {
         fprintf(stderr, "failed to create working dir for qxc\n");
         return -1;
     }
@@ -110,21 +111,20 @@ static void qxc_context_deinit(struct qxc_context* ctx) { rm_tmp_dir(ctx->work_d
 static int qxc_context_run(const struct qxc_context* ctx)
 {
     if (ctx->mode == TOKENIZE_MODE) {
-        auto tokens = array_create<Token>(256);
-        defer { array_destroy(&tokens); };
-        if (qxc_tokenize(&tokens, ctx->canonical_input_filepath) != 0) {
+        DynArray<Token> tokens(256);
+        if (tokenize(&tokens, ctx->canonical_input_filepath) != 0) {
             fprintf(stderr, "lexure failure\n");
             return -1;
         }
         printf("=== TOKENS ===\n");
-        for (size_t i = 0; i < tokens.length; i++) {
-            qxc_token_print(array_at(&tokens, i));
+        for (size_t i = 0; i < tokens.length(); i++) {
+            token_print(tokens[i]);
         }
         return 0;
     }
 
-    Program* program = qxc_parse(ctx->canonical_input_filepath);
-    if (program == NULL) {
+    Program* program = parse_program(ctx->canonical_input_filepath);
+    if (program == nullptr) {
         return -1;
     }
 

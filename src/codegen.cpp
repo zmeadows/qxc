@@ -6,25 +6,29 @@
 
 #include "flat_map.h"
 
+struct ScopeBlock {
+};
+
 #define QXC_STACK_OFFSETS_CAPACITY 64
-struct qxc_stack_offsets {
+struct StackOffsets {
     const char* variable_names[QXC_STACK_OFFSETS_CAPACITY];
     int variable_offsets[QXC_STACK_OFFSETS_CAPACITY];
     int stack_index;
     size_t count;
+
+    StackOffsets* parent = nullptr;
 };
 
-static struct qxc_stack_offsets qxc_stack_offsets_new(void)
+static StackOffsets stack_offsets_new(void)
 {
-    struct qxc_stack_offsets offsets;
+    StackOffsets offsets;
     offsets.count = 0;
     offsets.stack_index = -8;  // base of callers stack frame always saved as first entry
                                // of calee's stack frame, so start with -8 rather than 0
     return offsets;
 }
 
-static bool qxc_stack_offsets_contains(struct qxc_stack_offsets* offsets,
-                                       const char* name)
+static bool stack_offsets_contains(StackOffsets* offsets, const char* name)
 {
     const size_t count = offsets->count;
     for (size_t i = 0; i < count; i++) {
@@ -36,7 +40,7 @@ static bool qxc_stack_offsets_contains(struct qxc_stack_offsets* offsets,
     return false;
 }
 
-static int qxc_stack_offsets_insert(struct qxc_stack_offsets* offsets, const char* name)
+static int stack_offsets_insert(StackOffsets* offsets, const char* name)
 {
     const size_t old_count = offsets->count;
     assert(old_count < QXC_STACK_OFFSETS_CAPACITY);
@@ -47,7 +51,7 @@ static int qxc_stack_offsets_insert(struct qxc_stack_offsets* offsets, const cha
     return 0;
 }
 
-static int qxc_stack_offsets_lookup(struct qxc_stack_offsets* offsets, const char* name)
+static int stack_offsets_lookup(StackOffsets* offsets, const char* name)
 {
     const size_t count = offsets->count;
     for (size_t i = 0; i < count; i++) {
@@ -58,18 +62,17 @@ static int qxc_stack_offsets_lookup(struct qxc_stack_offsets* offsets, const cha
     exit(EXIT_FAILURE);
 }
 
-// static void qxc_stack_offsets_clear(struct qxc_stack_offsets* offsets)
+// static void stack_offsets_clear(StackOffsets* offsets)
 // {
 //     for (size_t i = 0; i < offsets->count; i++) {
-//         offsets->variable_names[i] = NULL;
+//         offsets->variable_names[i] = nullptr;
 //         offsets->variable_offsets[i] = 0;
 //     }
 //
 //     offsets->count = 0;
 // }
 
-#define LABEL_COUNTER_NAME_MAX_SIZE 256
-struct qxc_codegen {
+struct CodeGen {
     FILE* asm_output;
     size_t indent_level;
 
@@ -79,38 +82,35 @@ struct qxc_codegen {
 };
 
 #define JUMP_LABEL_MAX_LENGTH 64
-struct qxc_jump_label {
+struct JumpLabel {
     char buffer[JUMP_LABEL_MAX_LENGTH];
 };
 
-// static void build_logical_or_jump_labels(struct qxc_codegen* gen,
-//                                          struct qxc_jump_label* snd_label,
-//                                          struct qxc_jump_label* end_label)
-// {
-//     size_t count = ++gen->logical_or_counter;
-//     qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu", count);
-//     qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu", count);
-// }
+static void build_logical_or_jump_labels(CodeGen* gen, JumpLabel* snd_label,
+                                         JumpLabel* end_label)
+{
+    size_t count = ++gen->logical_or_counter;
+    qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu", count);
+    qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu", count);
+}
 
-static void build_logical_and_jump_labels(struct qxc_codegen* gen,
-                                          struct qxc_jump_label* snd_label,
-                                          struct qxc_jump_label* end_label)
+static void build_logical_and_jump_labels(CodeGen* gen, JumpLabel* snd_label,
+                                          JumpLabel* end_label)
 {
     size_t count = ++gen->logical_and_counter;
     qxc_snprintf(snd_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LAND_Snd_%zu", count);
     qxc_snprintf(end_label->buffer, JUMP_LABEL_MAX_LENGTH, "_LAND_End_%zu", count);
 }
 
-static void build_conditional_expr_jump_labels(struct qxc_codegen* gen,
-                                               struct qxc_jump_label* else_label,
-                                               struct qxc_jump_label* post_label)
+static void build_conditional_expr_jump_labels(CodeGen* gen, JumpLabel* else_label,
+                                               JumpLabel* post_label)
 {
     size_t count = ++gen->conditional_expr_counter;
     qxc_snprintf(else_label->buffer, JUMP_LABEL_MAX_LENGTH, "_CondExpr_Else_%zu", count);
     qxc_snprintf(post_label->buffer, JUMP_LABEL_MAX_LENGTH, "_CondExpr_Post_%zu", count);
 }
 
-static void emit(struct qxc_codegen* gen, const char* fmt, ...)
+static void emit(CodeGen* gen, const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -122,22 +122,16 @@ static void emit(struct qxc_codegen* gen, const char* fmt, ...)
     fprintf(gen->asm_output, "\n");
 }
 
-static void generate_expression_asm(struct qxc_codegen* gen,
-                                    struct qxc_stack_offsets* offsets,
+static void generate_expression_asm(CodeGen* gen, StackOffsets* offsets,
                                     struct ExprNode* expr);
 
-static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
-                                                     struct qxc_stack_offsets* offsets,
+static void generate_logical_OR_binop_expression_asm(CodeGen* gen, StackOffsets* offsets,
                                                      BinopExpr* binop_node)
 {
     assert(binop_node->op == Operator::LogicalOR);
 
-    struct qxc_jump_label snd_label, end_label;
-    const size_t jump_label_count = ++gen->logical_or_counter;
-    qxc_snprintf(snd_label.buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_Snd_%zu",
-                 jump_label_count);
-    qxc_snprintf(end_label.buffer, JUMP_LABEL_MAX_LENGTH, "_LOR_End_%zu",
-                 jump_label_count);
+    JumpLabel snd_label, end_label;
+    build_logical_or_jump_labels(gen, &snd_label, &end_label);
 
     generate_expression_asm(gen, offsets, binop_node->left_expr);
 
@@ -156,13 +150,12 @@ static void generate_logical_OR_binop_expression_asm(struct qxc_codegen* gen,
     emit(gen, "\n%s:", end_label.buffer);
 }
 
-static void generate_logical_AND_binop_expression_asm(struct qxc_codegen* gen,
-                                                      struct qxc_stack_offsets* offsets,
+static void generate_logical_AND_binop_expression_asm(CodeGen* gen, StackOffsets* offsets,
                                                       BinopExpr* binop_node)
 {
     assert(binop_node->op == Operator::LogicalAND);
 
-    struct qxc_jump_label snd_label, end_label;
+    JumpLabel snd_label, end_label;
     build_logical_and_jump_labels(gen, &snd_label, &end_label);
 
     generate_expression_asm(gen, offsets, binop_node->left_expr);
@@ -181,8 +174,7 @@ static void generate_logical_AND_binop_expression_asm(struct qxc_codegen* gen,
     emit(gen, "%s:", end_label.buffer);
 }
 
-static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
-                                                     struct qxc_stack_offsets* offsets,
+static void generate_assignment_binop_expression_asm(CodeGen* gen, StackOffsets* offsets,
                                                      BinopExpr* binop_node)
 {
     assert(binop_node->left_expr && binop_node->right_expr);
@@ -193,17 +185,16 @@ static void generate_assignment_binop_expression_asm(struct qxc_codegen* gen,
     // generate value to be assigned to variable in left_expr
     generate_expression_asm(gen, offsets, binop_node->right_expr);
 
-    if (!qxc_stack_offsets_contains(offsets, varname)) {
+    if (!stack_offsets_contains(offsets, varname)) {
         fprintf(stderr, "attempted to assign value to un-initialized variable: %s\n",
                 varname);
         exit(EXIT_FAILURE);
     }
 
-    emit(gen, "mov [rbp + %d], rax", qxc_stack_offsets_lookup(offsets, varname));
+    emit(gen, "mov [rbp + %d], rax", stack_offsets_lookup(offsets, varname));
 }
 
-static void generate_binop_expression_asm(struct qxc_codegen* gen,
-                                          struct qxc_stack_offsets* offsets,
+static void generate_binop_expression_asm(CodeGen* gen, StackOffsets* offsets,
                                           BinopExpr* binop_node)
 {
     const Operator op = binop_node->op;
@@ -284,8 +275,7 @@ static void generate_binop_expression_asm(struct qxc_codegen* gen,
     }
 }
 
-static void generate_expression_asm(struct qxc_codegen* gen,
-                                    struct qxc_stack_offsets* offsets,
+static void generate_expression_asm(CodeGen* gen, StackOffsets* offsets,
                                     struct ExprNode* node)
 {
     switch (node->type) {
@@ -320,7 +310,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
             return;
 
         case ExprType::Conditional: {
-            struct qxc_jump_label else_label, post_label;
+            JumpLabel else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
             generate_expression_asm(gen, offsets, node->cond_expr.conditional_expr);
@@ -335,13 +325,13 @@ static void generate_expression_asm(struct qxc_codegen* gen,
         }
 
         case ExprType::VariableRef:
-            if (!qxc_stack_offsets_contains(offsets, node->referenced_var_name)) {
+            if (!stack_offsets_contains(offsets, node->referenced_var_name)) {
                 fprintf(stderr, "referenced unknown variable: %s\n",
                         node->referenced_var_name);
                 exit(EXIT_FAILURE);
             }
             emit(gen, "mov rax, [rbp + %d]",
-                 qxc_stack_offsets_lookup(offsets, node->referenced_var_name));
+                 stack_offsets_lookup(offsets, node->referenced_var_name));
             return;
 
         default:
@@ -350,8 +340,7 @@ static void generate_expression_asm(struct qxc_codegen* gen,
     }
 }
 
-static void generate_statement_asm(struct qxc_codegen* gen,
-                                   struct qxc_stack_offsets* offsets,
+static void generate_statement_asm(CodeGen* gen, StackOffsets* offsets,
                                    StatementNode* statement_node)
 {
     assert(statement_node);
@@ -368,12 +357,12 @@ static void generate_statement_asm(struct qxc_codegen* gen,
             break;
 
         case StatementType::IfElse: {
-            struct qxc_jump_label else_label, post_label;
+            JumpLabel else_label, post_label;
             build_conditional_expr_jump_labels(gen, &else_label, &post_label);
 
             IfElseStatement* ifelse_stmt = statement_node->ifelse_statement;
 
-            // TODO: switch all NULL to nullptr
+            // TODO: switch all nullptr to nullptr
             if (ifelse_stmt->else_branch_statement != nullptr) {
                 generate_expression_asm(gen, offsets, ifelse_stmt->conditional_expr);
                 emit(gen, "cmp rax, 0");
@@ -401,11 +390,10 @@ static void generate_statement_asm(struct qxc_codegen* gen,
     return;
 }
 
-static void generate_declaration_asm(struct qxc_codegen* gen,
-                                     struct qxc_stack_offsets* offsets,
+static void generate_declaration_asm(CodeGen* gen, StackOffsets* offsets,
                                      Declaration* declaration)
 {
-    if (qxc_stack_offsets_contains(offsets, declaration->var_name)) {
+    if (stack_offsets_contains(offsets, declaration->var_name)) {
         fprintf(stderr, "variable declared twice: %s\n", declaration->var_name);
         exit(EXIT_FAILURE);
     }
@@ -421,11 +409,10 @@ static void generate_declaration_asm(struct qxc_codegen* gen,
     }
 
     // associate newly pushed stack value with the corresponding new variable
-    qxc_stack_offsets_insert(offsets, declaration->var_name);
+    stack_offsets_insert(offsets, declaration->var_name);
 }
 
-static void generate_block_item_asm(struct qxc_codegen* gen,
-                                    struct qxc_stack_offsets* offsets,
+static void generate_block_item_asm(CodeGen* gen, StackOffsets* offsets,
                                     BlockItemNode* block_item)
 {
     if (block_item->type == BlockItemType::Statement) {
@@ -444,7 +431,7 @@ static void generate_block_item_asm(struct qxc_codegen* gen,
 
 void generate_asm(Program* program, const char* output_filepath)
 {
-    struct qxc_codegen gen;
+    CodeGen gen;
     gen.indent_level = 0;
 
     gen.logical_or_counter = 0;
@@ -465,9 +452,9 @@ void generate_asm(Program* program, const char* output_filepath)
 
     // TODO: we'll have to revisit this once we start to compile programs with
     // functions other than 'main'.
-    struct qxc_stack_offsets offsets = qxc_stack_offsets_new();
+    StackOffsets offsets = stack_offsets_new();
 
-    if (program->main_decl != NULL) {
+    if (program->main_decl != nullptr) {
         for (BlockItemNode* b : program->main_decl->blist) {
             generate_block_item_asm(&gen, &offsets, b);
         }

@@ -22,14 +22,14 @@ void print_expression(struct ExprNode* node)
             break;
 
         case ExprType::UnaryOp:
-            PPRINT("UnaryOp<%s>:\n", qxc_operator_to_str(node->unop_expr.op));
+            PPRINT("UnaryOp<%s>:\n", operator_to_str(node->unop_expr.op));
             indent_level++;
             print_expression(node->unop_expr.child_expr);
             indent_level--;
             break;
 
         case ExprType::BinaryOp:
-            PPRINT("BinaryOp<%s>:\n", qxc_operator_to_str(node->binop_expr.op));
+            PPRINT("BinaryOp<%s>:\n", operator_to_str(node->binop_expr.op));
             indent_level++;
             print_expression(node->binop_expr.left_expr);
             print_expression(node->binop_expr.right_expr);
@@ -90,7 +90,7 @@ static void print_statement(StatementNode* statement)
         case StatementType::IfElse: {
             IfElseStatement* ifelse_stmt = statement->ifelse_statement;
 
-            if (ifelse_stmt->else_branch_statement != NULL) {
+            if (ifelse_stmt->else_branch_statement != nullptr) {
                 PPRINT("IfElseStatement:\n");
             }
             else {
@@ -107,7 +107,7 @@ static void print_statement(StatementNode* statement)
             print_statement(ifelse_stmt->if_branch_statement);
             indent_level--;
 
-            if (ifelse_stmt->else_branch_statement != NULL) {
+            if (ifelse_stmt->else_branch_statement != nullptr) {
                 PPRINT("ElseBranch:\n");
                 indent_level++;
                 print_statement(ifelse_stmt->else_branch_statement);

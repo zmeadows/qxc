@@ -4,4 +4,4 @@
 #include "prelude.h"
 #include "token.h"
 
-int qxc_tokenize(array<Token>* token_buffer, const char* filepath);
+int tokenize(DynArray<Token>* token_buffer, const char* filepath);

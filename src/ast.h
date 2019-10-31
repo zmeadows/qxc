@@ -47,7 +47,7 @@ struct StatementNode;
 struct IfElseStatement {
     ExprNode* conditional_expr = nullptr;
     StatementNode* if_branch_statement = nullptr;
-    StatementNode* else_branch_statement = nullptr;  // optional, may be NULL
+    StatementNode* else_branch_statement = nullptr;  // optional, may be nullptr
 };
 
 struct BlockItemNode;
@@ -58,7 +58,7 @@ struct StatementNode {
     union {
         ExprNode* return_expr;
         IfElseStatement* ifelse_statement;
-        array<BlockItemNode*> compound_statement_block_items;
+        DynArray<BlockItemNode*> compound_statement_block_items;
         ExprNode* standalone_expr;
     };
 };
@@ -87,7 +87,7 @@ struct BlockItemNode {
 
 struct FunctionDecl {
     const char* name = nullptr;
-    array<BlockItemNode*> blist;
+    DynArray<BlockItemNode*> blist;
 };
 
 // --------------------------------------------------------------------------------
@@ -97,5 +97,5 @@ struct Program {  // program
     struct qxc_memory_pool* pool = nullptr;
 };
 
-Program* qxc_parse(const char* filepath);
+Program* parse_program(const char* filepath);
 

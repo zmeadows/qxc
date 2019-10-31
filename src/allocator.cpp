@@ -26,7 +26,7 @@ struct qxc_memory_pool* qxc_memory_pool_init(size_t arena_size_bytes)
 {
     struct qxc_memory_pool* new_pool =
         static_cast<struct qxc_memory_pool*>(malloc(sizeof(struct qxc_memory_pool)));
-    new_pool->chain_tip = NULL;
+    new_pool->chain_tip = nullptr;
     new_pool->arena_size = arena_size_bytes;
     allocate_arena_chain_link(new_pool);
     return new_pool;

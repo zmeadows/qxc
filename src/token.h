@@ -36,10 +36,9 @@ enum class Operator {
     Invalid
 };
 
-const char* qxc_operator_to_str(Operator op);
-// Operator str_to_qxc_operator(const char* opstr);
-bool qxc_operator_can_be_unary(Operator op);
-bool qxc_operator_is_always_unary(Operator op);
+const char* operator_to_str(Operator op);
+bool operator_can_be_unary(Operator op);
+bool operator_is_always_unary(Operator op);
 
 enum class TokenType {
     CloseBrace,
@@ -67,5 +66,5 @@ struct Token {
     };
 };
 
-void qxc_token_print(Token* token);
+void token_print(const Token& token);
 

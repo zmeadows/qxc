@@ -27,11 +27,11 @@ struct Tokenizer {
     char next_char;
 };
 
-static int qxc_tokenizer_init(Tokenizer* tokenizer, const char* filepath)
+static int tokenizer_init(Tokenizer* tokenizer, const char* filepath)
 {
     FILE* f = fopen(filepath, "r");
 
-    if (f == NULL) {
+    if (f == nullptr) {
         return -1;
     }
 
@@ -64,9 +64,9 @@ static int qxc_tokenizer_init(Tokenizer* tokenizer, const char* filepath)
     return 0;
 }
 
-static void qxc_tokenizer_free(Tokenizer* tokenizer) { free(tokenizer->contents); }
+static void tokenizer_free(Tokenizer* tokenizer) { free(tokenizer->contents); }
 
-static void qxc_tokenizer_advance(Tokenizer* tokenizer)
+static void tokenizer_advance(Tokenizer* tokenizer)
 {
     tokenizer->next_char_ptr++;
     tokenizer->next_char = *tokenizer->next_char_ptr;
@@ -74,7 +74,7 @@ static void qxc_tokenizer_advance(Tokenizer* tokenizer)
 }
 
 // TODO remove?
-static inline void qxc_tokenizer_grow_id_buffer(Tokenizer* tokenizer)
+static inline void tokenizer_grow_id_buffer(Tokenizer* tokenizer)
 {
     tokenizer->id[tokenizer->id_len] = tokenizer->next_char;
     tokenizer->id_len++;
@@ -87,7 +87,7 @@ static inline bool is_valid_keyword_identifier_first_character(char c)
 
 static inline bool is_valid_operator_first_character(char c)
 {
-    return c != '\0' && strchr(":?-+/*!~&|=<>", c) != NULL;
+    return c != '\0' && strchr(":?-+/*!~&|=<>", c) != nullptr;
 }
 
 static inline bool can_be_digraph_first_character(char c) { return strchr("&|!=<>", c); }
@@ -159,19 +159,19 @@ static inline bool is_valid_keyword_identifier_trailing_character(char c)
 
 // FIXME: need separate functions for consuming different types of
 // literals/identifiers
-static void qxc_tokenizer_consume_id(Tokenizer* tokenizer)
+static void tokenizer_consume_id(Tokenizer* tokenizer)
 {
     tokenizer->id[0] = '\0';
     tokenizer->id_len = 0;
-    qxc_tokenizer_grow_id_buffer(tokenizer);
-    qxc_tokenizer_advance(tokenizer);
+    tokenizer_grow_id_buffer(tokenizer);
+    tokenizer_advance(tokenizer);
 
     while (is_valid_keyword_identifier_trailing_character(tokenizer->next_char)) {
         // if (tokenizer.id_len == QXC_MAXIMUM_IDENTIFIER_LENGTH-1) {  // report
         // error
         // }
-        qxc_tokenizer_grow_id_buffer(tokenizer);
-        qxc_tokenizer_advance(tokenizer);
+        tokenizer_grow_id_buffer(tokenizer);
+        tokenizer_advance(tokenizer);
     }
 
     tokenizer->id[tokenizer->id_len] = '\0';
@@ -179,13 +179,13 @@ static void qxc_tokenizer_consume_id(Tokenizer* tokenizer)
 
 static inline bool is_valid_symbol(char c)
 {
-    return c != '\0' && strchr("{}();", c) != NULL;
+    return c != '\0' && strchr("{}();", c) != nullptr;
 }
 
-static void qxc_build_symbol_token(Tokenizer* tokenizer, array<Token>* token_buffer,
-                                   char c)
+static void build_symbol_token(Tokenizer* tokenizer, DynArray<Token>* token_buffer,
+                               char c)
 {
-    Token* new_token = array_extend(token_buffer);
+    Token* new_token = token_buffer->append();
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
 
@@ -211,17 +211,17 @@ static void qxc_build_symbol_token(Tokenizer* tokenizer, array<Token>* token_buf
     }
 }
 
-static inline void qxc_consume_symbol_token(Tokenizer* tokenizer,
-                                            array<Token>* token_buffer)
+static inline void consume_symbol_token(Tokenizer* tokenizer,
+                                        DynArray<Token>* token_buffer)
 {
-    qxc_build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
-    qxc_tokenizer_advance(tokenizer);
+    build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
+    tokenizer_advance(tokenizer);
 }
 
-static void qxc_build_operator_token(Tokenizer* tokenizer, array<Token>* token_buffer,
-                                     Operator op)
+static void build_operator_token(Tokenizer* tokenizer, DynArray<Token>* token_buffer,
+                                 Operator op)
 {
-    Token* new_token = array_extend(token_buffer);
+    Token* new_token = token_buffer->append();
     new_token->type = TokenType::Operator;
     new_token->op = op;
     new_token->line = tokenizer->current_line;
@@ -229,29 +229,29 @@ static void qxc_build_operator_token(Tokenizer* tokenizer, array<Token>* token_b
 }
 
 // 'consume' == build + advance tokenizer
-static void qxc_consume_operator_token(Tokenizer* tokenizer, array<Token>* token_buffer,
-                                       Operator op)
+static void consume_operator_token(Tokenizer* tokenizer, DynArray<Token>* token_buffer,
+                                   Operator op)
 {
-    qxc_build_operator_token(tokenizer, token_buffer, op);
-    qxc_tokenizer_advance(tokenizer);
+    build_operator_token(tokenizer, token_buffer, op);
+    tokenizer_advance(tokenizer);
 }
 
-int qxc_tokenize(array<Token>* token_buffer, const char* filepath)
+int tokenize(DynArray<Token>* token_buffer, const char* filepath)
 {
-    array_clear(token_buffer);
+    token_buffer->clear();
 
     Tokenizer tokenizer;
 
-    if (qxc_tokenizer_init(&tokenizer, filepath) != 0) {
+    if (tokenizer_init(&tokenizer, filepath) != 0) {
         debug_print("failed to initializer tokenizer");
         return -1;
     }
 
     while (1) {
         if (is_valid_keyword_identifier_first_character(tokenizer.next_char)) {
-            qxc_tokenizer_consume_id(&tokenizer);
+            tokenizer_consume_id(&tokenizer);
 
-            Token* new_token = array_extend(token_buffer);
+            Token* new_token = token_buffer->append();
 
             Keyword keyword = str_to_keyword(tokenizer.id);
 
@@ -272,28 +272,28 @@ int qxc_tokenize(array<Token>* token_buffer, const char* filepath)
         }
 
         else if (is_valid_symbol(tokenizer.next_char)) {
-            qxc_consume_symbol_token(&tokenizer, token_buffer);
+            consume_symbol_token(&tokenizer, token_buffer);
         }
 
         else if (is_valid_operator_first_character(tokenizer.next_char)) {
             char c1 = tokenizer.next_char;
-            qxc_tokenizer_advance(&tokenizer);
+            tokenizer_advance(&tokenizer);
             char c2 = tokenizer.next_char;
 
             Operator digraph_op = try_build_digraph_operator(c1, c2);
 
             if (digraph_op != Operator::Invalid) {
-                qxc_consume_operator_token(&tokenizer, token_buffer, digraph_op);
+                consume_operator_token(&tokenizer, token_buffer, digraph_op);
             }
             else {
                 Operator maybe_unigraph_op = build_unigraph_operator(c1);
 
                 if (maybe_unigraph_op != Operator::Invalid) {
-                    qxc_build_operator_token(&tokenizer, token_buffer, maybe_unigraph_op);
+                    build_operator_token(&tokenizer, token_buffer, maybe_unigraph_op);
                 }
                 else if (c1 == '=') {
                     // FIXME: this is messy
-                    qxc_build_symbol_token(&tokenizer, token_buffer, '=');
+                    build_symbol_token(&tokenizer, token_buffer, '=');
                 }
                 else {
                     fprintf(stderr, "invalid operator-like character encountered: %c\n",
@@ -313,20 +313,20 @@ int qxc_tokenize(array<Token>* token_buffer, const char* filepath)
             tokenizer.current_column = 1;
         }
         else if (tokenizer.next_char == ' ') {
-            qxc_tokenizer_advance(&tokenizer);
+            tokenizer_advance(&tokenizer);
         }
 
         else if (tokenizer.next_char >= '0' && tokenizer.next_char <= '9') {
-            qxc_tokenizer_consume_id(&tokenizer);
+            tokenizer_consume_id(&tokenizer);
 
             errno = 0;
-            long maybe_value = strtol(tokenizer.id, NULL, 10);
+            long maybe_value = strtol(tokenizer.id, nullptr, 10);
             if (errno != 0) {
                 fprintf(stderr, "failed to parse integer literal\n");
                 return -1;
             }
 
-            Token* new_token = array_extend(token_buffer);
+            Token* new_token = token_buffer->append();
             new_token->type = TokenType::IntLiteral;
             new_token->line = tokenizer.current_line;
             new_token->column = tokenizer.current_column - tokenizer.id_len;
@@ -341,12 +341,12 @@ int qxc_tokenize(array<Token>* token_buffer, const char* filepath)
         else {
             debug_print("encountered unexpected character: %c %d\n", tokenizer.next_char,
                         (int)tokenizer.next_char);
-            // TODO: free buffer and return NULL here
+            // TODO: free buffer and return nullptr here
             break;
         }
     }
 
-    qxc_tokenizer_free(&tokenizer);
+    tokenizer_free(&tokenizer);
 
     return 0;
 }

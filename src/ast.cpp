@@ -31,7 +31,7 @@
 
 struct Parser {
     struct qxc_memory_pool* pool;
-    array<Token> token_buffer;
+    DynArray<Token> token_buffer;
     size_t itoken;
 
     static Parser create(void)
@@ -39,17 +39,9 @@ struct Parser {
         Parser parser;
 
         parser.pool = qxc_memory_pool_init(1e3);
-        parser.token_buffer = array_create<Token>(256);
         parser.itoken = 0;
 
         return parser;
-    }
-
-    static void destroy(Parser* parser)
-    {
-        // qxc_memory_pool_release(parser->pool);
-        array_destroy(&parser->token_buffer);
-        parser->itoken = 0;
     }
 };
 
@@ -59,15 +51,15 @@ struct Parser {
             fprintf(stderr, "%s:%d:%s(): ", __FILE__, __LINE__, __func__); \
             fprintf(stderr, __VA_ARGS__);                                  \
             fprintf(stderr, "\n");                                         \
-            return NULL;                                                   \
+            return nullptr;                                                \
         }                                                                  \
     } while (0)
 
-#define EXPECT_(EXPR)    \
-    do {                 \
-        if (!(EXPR)) {   \
-            return NULL; \
-        }                \
+#define EXPECT_(EXPR)       \
+    do {                    \
+        if (!(EXPR)) {      \
+            return nullptr; \
+        }                   \
     } while (0)
 
 // TODO: remove all this alloc_* functions
@@ -95,16 +87,15 @@ static inline StatementNode* alloc_empty_statement(Parser* parser)
 static inline Declaration* alloc_empty_declaration_node(Parser* parser)
 {
     auto decl = qxc_malloc<Declaration>(parser->pool);
-    decl->var_name = NULL;
-    decl->initializer_expr = NULL;
+    decl->var_name = nullptr;
+    decl->initializer_expr = nullptr;
     return decl;
 }
 
 static inline FunctionDecl* alloc_empty_function_decl(Parser* parser)
 {
     auto decl = qxc_malloc<FunctionDecl>(parser->pool);
-    decl->blist = array_create<BlockItemNode*>(16);
-    decl->name = NULL;
+    decl->name = nullptr;
 
     return decl;
 }
@@ -119,32 +110,32 @@ static inline FunctionDecl* alloc_empty_function_decl(Parser* parser)
 
 static Token* pop_next_token(Parser* parser)
 {
-    if (parser->itoken < parser->token_buffer.length) {
-        return array_at(&parser->token_buffer, parser->itoken++);
+    if (parser->itoken < parser->token_buffer.length()) {
+        return &parser->token_buffer[parser->itoken++];
     }
     else {
-        return NULL;
+        return nullptr;
     }
 }
 
 static Token* peek_next_token(Parser* parser)
 {
-    if (parser->itoken < parser->token_buffer.length) {
-        return array_at(&parser->token_buffer, parser->itoken);
+    if (parser->itoken < parser->token_buffer.length()) {
+        return &parser->token_buffer[parser->itoken];
     }
     else {
-        return NULL;
+        return nullptr;
     }
 }
 
-static Token* qxc_parser_expect_token_type(Parser* parser, TokenType expected_token_type)
+static Token* expect_token_type(Parser* parser, TokenType expected_token_type)
 {
     Token* next_token = pop_next_token(parser);
     EXPECT_(next_token && next_token->type == expected_token_type);
     return next_token;
 }
 
-static Token* qxc_parser_expect_keyword(Parser* parser, Keyword expected_keyword)
+static Token* expect_keyword(Parser* parser, Keyword expected_keyword)
 {
     Token* next_token = pop_next_token(parser);
 
@@ -156,8 +147,7 @@ static Token* qxc_parser_expect_keyword(Parser* parser, Keyword expected_keyword
     return next_token;
 }
 
-static Token* qxc_parser_expect_identifier(Parser* parser,
-                                           const char* expected_identifier)
+static Token* expect_identifier(Parser* parser, const char* expected_identifier)
 {
     Token* next_token = pop_next_token(parser);
 
@@ -168,7 +158,7 @@ static Token* qxc_parser_expect_identifier(Parser* parser,
     return next_token;
 }
 
-// static Token* qxc_parser_expect_operator(Parser* parser,
+// static Token* expect_operator(Parser* parser,
 //                                                     Operator expected_op)
 // {
 //     Token* next_token = pop_next_token(parser);
@@ -180,9 +170,9 @@ static Token* qxc_parser_expect_identifier(Parser* parser,
 //     return next_token;
 // }
 
-static struct ExprNode* qxc_parse_expression(Parser*);
+static struct ExprNode* parse_expression(Parser*);
 
-static struct ExprNode* qxc_parse_factor(Parser* parser)
+static struct ExprNode* parse_factor(Parser* parser)
 {
     auto factor = qxc_malloc<struct ExprNode>(parser->pool);
 
@@ -198,23 +188,23 @@ static struct ExprNode* qxc_parse_factor(Parser* parser)
             break;
 
         case TokenType::Operator:
-            EXPECT(qxc_operator_can_be_unary(next_token->op),
+            EXPECT(operator_can_be_unary(next_token->op),
                    "non-unary operator in unary operator context: %s",
-                   qxc_operator_to_str(next_token->op));
+                   operator_to_str(next_token->op));
             factor->type = ExprType::UnaryOp;
             factor->unop_expr.op = next_token->op;
-            factor->unop_expr.child_expr = qxc_parse_factor(parser);
+            factor->unop_expr.child_expr = parse_factor(parser);
             EXPECT(factor->unop_expr.child_expr,
                    "Failed to parse child expression of unary operator");
             break;
 
         case TokenType::OpenParen:
             debug_print("attempting to parse paren closed expression...");
-            factor = qxc_parse_expression(parser);
+            factor = parse_expression(parser);
 
             EXPECT(factor, "failed to parse paren-closed expression");
 
-            EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseParen),
+            EXPECT(expect_token_type(parser, TokenType::CloseParen),
                    "Missing close parenthesis after enclosed factor");
 
             debug_print("found close paren for enclosed expression");
@@ -227,7 +217,7 @@ static struct ExprNode* qxc_parse_factor(Parser* parser)
             break;
 
         default:
-            return NULL;
+            return nullptr;
     }
 
     return factor;
@@ -295,8 +285,8 @@ static bool binop_valid_for_logical_or_expr_or_below(Operator op)
 
 // remember, if things get wonky you can re-write the parser explicitely for each
 // production rule in the grammar
-static struct ExprNode* qxc_parse_logical_or_expr_(Parser* parser, ExprNode* left_factor,
-                                                   int min_precedence)
+static struct ExprNode* parse_logical_or_expr_(Parser* parser, ExprNode* left_factor,
+                                               int min_precedence)
 {
     Token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
@@ -312,8 +302,8 @@ static struct ExprNode* qxc_parse_logical_or_expr_(Parser* parser, ExprNode* lef
         }
 
         next_token = pop_next_token(parser);
-        struct ExprNode* right_expr = qxc_parse_logical_or_expr_(
-            parser, qxc_parse_factor(parser), next_op_precedence);
+        struct ExprNode* right_expr =
+            parse_logical_or_expr_(parser, parse_factor(parser), next_op_precedence);
         EXPECT_(right_expr);
 
         struct ExprNode* new_expr = alloc_empty_expression(parser);
@@ -331,16 +321,16 @@ static struct ExprNode* qxc_parse_logical_or_expr_(Parser* parser, ExprNode* lef
     return left_factor;
 }
 
-static struct ExprNode* qxc_parse_logical_or_expr(Parser* parser,
-                                                  struct ExprNode* left_factor)
+static struct ExprNode* parse_logical_or_expr(Parser* parser,
+                                              struct ExprNode* left_factor)
 {
-    return qxc_parse_logical_or_expr_(parser, left_factor, -1);
+    return parse_logical_or_expr_(parser, left_factor, -1);
 }
 
-static struct ExprNode* qxc_parse_conditional_expression(Parser* parser,
-                                                         struct ExprNode* left_factor)
+static struct ExprNode* parse_conditional_expression(Parser* parser,
+                                                     struct ExprNode* left_factor)
 {
-    struct ExprNode* lor_expr = qxc_parse_logical_or_expr(parser, left_factor);
+    struct ExprNode* lor_expr = parse_logical_or_expr(parser, left_factor);
 
     Token* next_token = peek_next_token(parser);
     EXPECT_(next_token);
@@ -351,10 +341,10 @@ static struct ExprNode* qxc_parse_conditional_expression(Parser* parser,
         struct ExprNode* ternary_expr = alloc_empty_expression(parser);
         ternary_expr->type = ExprType::Conditional;
         ternary_expr->cond_expr.conditional_expr = lor_expr;
-        ternary_expr->cond_expr.if_expr = qxc_parse_expression(parser);
+        ternary_expr->cond_expr.if_expr = parse_expression(parser);
         (void)pop_next_token(parser);
         ternary_expr->cond_expr.else_expr =
-            qxc_parse_conditional_expression(parser, qxc_parse_factor(parser));
+            parse_conditional_expression(parser, parse_factor(parser));
 
         return ternary_expr;
     }
@@ -363,9 +353,9 @@ static struct ExprNode* qxc_parse_conditional_expression(Parser* parser,
     }
 }
 
-static struct ExprNode* qxc_parse_expression(Parser* parser)
+static struct ExprNode* parse_expression(Parser* parser)
 {
-    struct ExprNode* left_factor = qxc_parse_factor(parser);
+    struct ExprNode* left_factor = parse_factor(parser);
     EXPECT_(left_factor);
 
     Token* next_token = peek_next_token(parser);
@@ -381,16 +371,16 @@ static struct ExprNode* qxc_parse_expression(Parser* parser)
         assign_expr->type = ExprType::BinaryOp;
         assign_expr->binop_expr.op = Operator::Assignment;
         assign_expr->binop_expr.left_expr = left_factor;
-        assign_expr->binop_expr.right_expr = qxc_parse_expression(parser);
+        assign_expr->binop_expr.right_expr = parse_expression(parser);
 
         return assign_expr;
     }
     else {
-        return qxc_parse_conditional_expression(parser, left_factor);
+        return parse_conditional_expression(parser, left_factor);
     }
 }
 
-static Declaration* qxc_parse_declaration(Parser* parser)
+static Declaration* parse_declaration(Parser* parser)
 {
     Token* next_token = pop_next_token(parser);  // pop off int keyword
     assert(next_token->type == TokenType::KeyWord && next_token->keyword == Keyword::Int);
@@ -412,19 +402,19 @@ static Declaration* qxc_parse_declaration(Parser* parser)
     if (next_token && next_token->type == TokenType::Operator &&
         next_token->op == Operator::Assignment) {
         pop_next_token(parser);  // pop off '='
-        new_declaration->initializer_expr = qxc_parse_expression(parser);
+        new_declaration->initializer_expr = parse_expression(parser);
         EXPECT(new_declaration->initializer_expr, "Failed to parse variable initializer");
     }
 
-    EXPECT(qxc_parser_expect_token_type(parser, TokenType::SemiColon),
+    EXPECT(expect_token_type(parser, TokenType::SemiColon),
            "Missing semicolon at end of declaration");
 
     return new_declaration;
 }
 
-static BlockItemNode* qxc_parse_block_item(Parser* parser);
+static BlockItemNode* parse_block_item(Parser* parser);
 
-static StatementNode* qxc_parse_statement(Parser* parser)
+static StatementNode* parse_statement(Parser* parser)
 {
     Token* next_token = peek_next_token(parser);
 
@@ -434,10 +424,10 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         next_token->keyword == Keyword::Return) {
         pop_next_token(parser);  // pop off return keyword
         statement->type = StatementType::Return;
-        statement->return_expr = qxc_parse_expression(parser);
+        statement->return_expr = parse_expression(parser);
         EXPECT(statement->return_expr, "Expression parsing failed");
 
-        EXPECT(qxc_parser_expect_token_type(parser, TokenType::SemiColon),
+        EXPECT(expect_token_type(parser, TokenType::SemiColon),
                "Missing semicolon at end of statement");
     }
     else if (next_token->type == TokenType::KeyWord &&
@@ -446,9 +436,9 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         statement->type = StatementType::IfElse;
 
         IfElseStatement* ifelse_stmt = qxc_malloc<IfElseStatement>(parser->pool);
-        ifelse_stmt->conditional_expr = qxc_parse_expression(parser);
+        ifelse_stmt->conditional_expr = parse_expression(parser);
         EXPECT_(ifelse_stmt->conditional_expr);
-        ifelse_stmt->if_branch_statement = qxc_parse_statement(parser);
+        ifelse_stmt->if_branch_statement = parse_statement(parser);
         EXPECT_(ifelse_stmt->if_branch_statement);
         statement->ifelse_statement = ifelse_stmt;
 
@@ -457,7 +447,7 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         if (next_token && next_token->type == TokenType::KeyWord &&
             next_token->keyword == Keyword::Else) {
             (void)pop_next_token(parser);  // pop off 'else' keyword
-            ifelse_stmt->else_branch_statement = qxc_parse_statement(parser);
+            ifelse_stmt->else_branch_statement = parse_statement(parser);
             EXPECT_(ifelse_stmt->else_branch_statement);
         }
     }
@@ -466,15 +456,15 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         statement->type = StatementType::Compound;
 
         // TODO: abstract out to parse_block_item_list
-        statement->compound_statement_block_items = array_create<BlockItemNode*>(4);
+        statement->compound_statement_block_items = DynArray<BlockItemNode*>(4);
         while (peek_next_token(parser)->type != TokenType::CloseBrace) {
-            BlockItemNode* next_block_item = qxc_parse_block_item(parser);
+            BlockItemNode* next_block_item = parse_block_item(parser);
             EXPECT(next_block_item, "Failed to parse block item in function: main");
-            array_extend(&statement->compound_statement_block_items, next_block_item);
+            statement->compound_statement_block_items.append(next_block_item);
             debug_print("successfully parsed block item");
         }
 
-        EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseBrace),
+        EXPECT(expect_token_type(parser, TokenType::CloseBrace),
                "Missing closing brace at end of compound statement");
     }
     else {
@@ -482,21 +472,21 @@ static StatementNode* qxc_parse_statement(Parser* parser)
         // for now the only meaningful stand-alone expression is variable assignment
         // i.e. a = 2;
         debug_print("attempting to parse standalone expression");
-        struct ExprNode* standalone_expression = qxc_parse_expression(parser);
+        struct ExprNode* standalone_expression = parse_expression(parser);
 
         EXPECT(standalone_expression, "Failed to parse standalone expression");
 
         statement->type = StatementType::StandAloneExpr;
         statement->standalone_expr = standalone_expression;
 
-        EXPECT(qxc_parser_expect_token_type(parser, TokenType::SemiColon),
+        EXPECT(expect_token_type(parser, TokenType::SemiColon),
                "Missing semicolon at end of statement");
     }
 
     return statement;
 }
 
-static BlockItemNode* qxc_parse_block_item(Parser* parser)
+static BlockItemNode* parse_block_item(Parser* parser)
 {
     Token* next_token = peek_next_token(parser);
     EXPECT(next_token, "Expected another block item here!");
@@ -505,62 +495,58 @@ static BlockItemNode* qxc_parse_block_item(Parser* parser)
 
     if (next_token->type == TokenType::KeyWord && next_token->keyword == Keyword::Int) {
         block_item->type = BlockItemType::Declaration;
-        block_item->declaration = qxc_parse_declaration(parser);
+        block_item->declaration = parse_declaration(parser);
         EXPECT_(block_item->declaration);
     }
     else {
         block_item->type = BlockItemType::Statement;
-        block_item->statement = qxc_parse_statement(parser);
+        block_item->statement = parse_statement(parser);
         EXPECT_(block_item->statement);
     }
 
     return block_item;
 }
 
-static FunctionDecl* qxc_parse_function_decl(Parser* parser)
+static FunctionDecl* parse_function_decl(Parser* parser)
 {
-    EXPECT(qxc_parser_expect_keyword(parser, Keyword::Int),
+    EXPECT(expect_keyword(parser, Keyword::Int),
            "Invalid main type signature, must return int.");
 
-    EXPECT(qxc_parser_expect_identifier(parser, "main"), "Invalid main function name");
+    EXPECT(expect_identifier(parser, "main"), "Invalid main function name");
 
-    EXPECT(qxc_parser_expect_token_type(parser, TokenType::OpenParen),
-           "Missing open parenthesis");
+    EXPECT(expect_token_type(parser, TokenType::OpenParen), "Missing open parenthesis");
 
     // arg parsing would go here, if we allowed function arguments yet
 
-    EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseParen),
-           "Missing close parenthesis");
+    EXPECT(expect_token_type(parser, TokenType::CloseParen), "Missing close parenthesis");
 
-    EXPECT(qxc_parser_expect_token_type(parser, TokenType::OpenBrace),
-           "Missing open brace token");
+    EXPECT(expect_token_type(parser, TokenType::OpenBrace), "Missing open brace token");
 
     FunctionDecl* decl = alloc_empty_function_decl(parser);
     decl->name = "main";
 
     while (peek_next_token(parser)->type != TokenType::CloseBrace) {
-        BlockItemNode* next_block_item = qxc_parse_block_item(parser);
+        BlockItemNode* next_block_item = parse_block_item(parser);
         EXPECT(next_block_item, "Failed to parse block item in function: main");
-        array_extend(&decl->blist, next_block_item);
+        decl->blist.append(next_block_item);
         debug_print("successfully parsed block item");
     }
 
-    EXPECT(qxc_parser_expect_token_type(parser, TokenType::CloseBrace),
+    EXPECT(expect_token_type(parser, TokenType::CloseBrace),
            "Missing close brace token at end of function: main");
 
     return decl;
 }
 
-Program* qxc_parse(const char* filepath)
+Program* parse_program(const char* filepath)
 {
     Parser parser = Parser::create();
-    defer { Parser::destroy(&parser); };
 
-    if (qxc_tokenize(&parser.token_buffer, filepath) != 0) {
-        return NULL;
+    if (tokenize(&parser.token_buffer, filepath) != 0) {
+        return nullptr;
     }
 
-    FunctionDecl* main_decl = qxc_parse_function_decl(&parser);
+    FunctionDecl* main_decl = parse_function_decl(&parser);
 
     EXPECT(main_decl, "Failed to parse main function declaration");
 

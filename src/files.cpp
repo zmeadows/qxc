@@ -10,7 +10,7 @@
 //     const char* const contents;
 // };
 //
-// static struct file_contents* s_files = NULL;
+// static struct file_contents* s_files = nullptr;
 // static size_t s_files_count = 0;
 // static size_t s_files_capacity = 0;
 //
@@ -27,8 +27,8 @@
 //
 //     FILE* f = fopen(filepath, "r");
 //
-//     if (f == NULL) {
-//         return NULL;
+//     if (f == nullptr) {
+//         return nullptr;
 //     }
 //
 //     // get the file size in bytes
@@ -36,7 +36,7 @@
 //     long fsizel = ftell(f);
 //
 //     if (fsizel < 0) {
-//         return NULL;
+//         return nullptr;
 //     }
 //
 //     size_t fsize = (size_t)fsizel;

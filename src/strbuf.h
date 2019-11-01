@@ -5,13 +5,38 @@
 
 #include "prelude.h"
 
-// #define STRBUF_STACK_SIZE 8
-// struct strbuf {
-//     char stack_data[STRBUF_STACK_SIZE];
-//     char* contents;
-//     size_t capacity;
-//     size_t length;
-// };
+// TODO: add optional stack storage?
+// TODO: eventually, add string table and string references to avoid duplicating same
+// string many times during compilation
+class String {
+    size_t m_length;
+    char* m_contents;
+
+public:
+    char* cstr(void) { return m_contents; }
+
+    String(void) = delete;
+
+    String(const char* cstr) : m_length(strlen(cstr)), m_contents((char*)malloc(m_length))
+    {
+        strncpy(m_contents, cstr, m_length);
+    }
+
+    inline bool operator==(const String& str)
+    {
+        return strs_are_equal(m_contents, str.m_contents);
+    }
+
+    inline bool operator!=(const String& str)
+    {
+        return !strs_are_equal(m_contents, str.m_contents);
+    }
+
+    char* begin(void) { return m_contents; }
+    char* end(void) { return m_contents + m_length; }
+    const char* begin(void) const { return m_contents; }
+    const char* end(void) const { return m_contents + m_length; }
+};
 
 // struct strbuf strbuf_empty()
 // {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "strbuf.h"
+
 namespace {
 
 template <typename T>
@@ -29,18 +31,27 @@ struct DefaultSentinels<T*> {
     static T* tombstone = (T*)0x1;
 };
 
+template <>
+struct DefaultSentinels<String> {
+    static String empty;
+    static String tombstone;
+};
+
+String DefaultSentinels<String>::empty = String("/!@#$%#$%^&$%$%^&#@$");
+String DefaultSentinels<String>::tombstone = String("%^@#$$&^%^@#$#$%^%^&");
+
 template <typename T>
 struct DefaultHasher {
     static_assert(
         sizeof(T) == -1,
         "Default Hasher doesn't exist for this key type, use custom implementation!");
-    uint64_t hash(T key);
+    uint64_t hash(const T& key);
 };
 
 // pointer hashing
 template <typename T>
 struct DefaultHasher<T*> {
-    uint64_t hash(T* key_ptr)
+    uint64_t hash(const T*& key_ptr)
     {
         auto key = reinterpret_cast<uintptr_t>(key_ptr);
         key = (~key) + (key << 21);  // key = (key << 21) - key - 1;
@@ -54,11 +65,24 @@ struct DefaultHasher<T*> {
     }
 };
 
+template <>
+struct DefaultHasher<String> {
+    uint64_t hash(const String& str)
+    {
+        uint64_t h = 5381;
+
+        for (const char c : str) {
+            h = ((h << 5) + h) + static_cast<uint64_t>(c);
+        }
+
+        return h;
+    }
+};
+
 }  // namespace
 
-template <typename K, typename V, class Hasher = DefaultHasher<K>,
-          K EMPTY_SENTINEL = DefaultSentinels<K>::empty,
-          K TOMBSTONE_SENTINEL = DefaultSentinels<K>::tombstone>
+template <typename K, typename V, typename Hasher = DefaultHasher<K>,
+          typename Sentinels = DefaultSentinels<K>>
 class DenseHashTable {
     uint8_t* m_keys;
     uint8_t* m_values;
@@ -83,16 +107,13 @@ class DenseHashTable {
 
         for (size_t i = 0; i < m_capacity; i++) {
             const K& k = keys[i];
-            if (k != EMPTY_SENTINEL && k != TOMBSTONE_SENTINEL) {
+            if (k != Sentinels::empty && k != Sentinels::tombstone) {
                 new_table.insert(k, std::move(values[i]));
             }
         }
 
         assert(m_count == new_table.m_count);
-        std::swap(m_keys, new_table.m_keys);
-        std::swap(m_values, new_table.m_values);
-        std::swap(m_capacity, new_table.m_capacity);
-        std::swap(m_longest_probe, new_table.m_longest_probe);
+        std::swap(*this, new_table);
     }
 
 public:
@@ -113,7 +134,7 @@ public:
         K* keys_cast = this->cast_keys();
 
         for (size_t i = 0; i < m_capacity; i++) {
-            keys_cast[i] = EMPTY_SENTINEL;
+            keys_cast[i] = Sentinels::empty;
         }
     }
 
@@ -131,7 +152,7 @@ public:
 
         for (size_t i = 0; i < m_capacity; i++) {
             K& key = keys_cast[i];
-            if (key != EMPTY_SENTINEL && key != TOMBSTONE_SENTINEL) {
+            if (key != Sentinels::empty && key != Sentinels::tombstone) {
                 values_cast[i].~V();
             }
             key.~K();
@@ -182,7 +203,7 @@ public:
             if (probed_id == lookup_id) {
                 return values + probe_index;
             }
-            else if (probed_id == EMPTY_SENTINEL) {
+            else if (probed_id == Sentinels::empty) {
                 return nullptr;
             }
 
@@ -214,7 +235,7 @@ public:
         while (true) {
             K& probed_id = keys[probe_index];
 
-            if (probed_id == TOMBSTONE_SENTINEL || probed_id == EMPTY_SENTINEL) {
+            if (probed_id == Sentinels::tombstone || probed_id == Sentinels::empty) {
                 probed_id = new_key;
                 std::swap(new_value, values[probe_index]);
                 m_count++;
@@ -254,12 +275,12 @@ public:
             K& probed_id = keys[probe_index];
 
             if (probed_id == id) {
-                probed_id = TOMBSTONE_SENTINEL;
+                probed_id = Sentinels::tombstone;
                 values[probe_index].~V();
                 m_count--;
                 return true;
             }
-            else if (probed_id == EMPTY_SENTINEL) {
+            else if (probed_id == Sentinels::empty) {
                 return false;
             }
 

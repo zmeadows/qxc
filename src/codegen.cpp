@@ -5,28 +5,17 @@
 #include <stdio.h>
 
 #include "flat_map.h"
-
-struct ScopeBlock {
-};
+#include "strbuf.h"
 
 #define QXC_STACK_OFFSETS_CAPACITY 64
 struct StackOffsets {
-    const char* variable_names[QXC_STACK_OFFSETS_CAPACITY];
-    int variable_offsets[QXC_STACK_OFFSETS_CAPACITY];
-    int stack_index;
-    size_t count;
-
+    DenseHashTable<String, int> m_table;
+    const char* variable_names[QXC_STACK_OFFSETS_CAPACITY] = {0};
+    int variable_offsets[QXC_STACK_OFFSETS_CAPACITY] = {0};
+    size_t count = 0;
+    int stack_index = -8;
     StackOffsets* parent = nullptr;
 };
-
-static StackOffsets stack_offsets_new(void)
-{
-    StackOffsets offsets;
-    offsets.count = 0;
-    offsets.stack_index = -8;  // base of callers stack frame always saved as first entry
-                               // of calee's stack frame, so start with -8 rather than 0
-    return offsets;
-}
 
 static bool stack_offsets_contains(StackOffsets* offsets, const char* name)
 {
@@ -452,7 +441,7 @@ void generate_asm(Program* program, const char* output_filepath)
 
     // TODO: we'll have to revisit this once we start to compile programs with
     // functions other than 'main'.
-    StackOffsets offsets = stack_offsets_new();
+    StackOffsets offsets;
 
     if (program->main_decl != nullptr) {
         for (BlockItemNode* b : program->main_decl->blist) {

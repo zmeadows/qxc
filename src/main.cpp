@@ -111,15 +111,19 @@ static void qxc_context_deinit(struct qxc_context* ctx) { rm_tmp_dir(ctx->work_d
 static int qxc_context_run(const struct qxc_context* ctx)
 {
     if (ctx->mode == TOKENIZE_MODE) {
-        DynArray<Token> tokens(256);
+        DynHeapArray<Token> tokens = heap_array_create<Token>(256);
+        defer { array_free(&tokens); };
+
         if (tokenize(&tokens, ctx->canonical_input_filepath) != 0) {
             fprintf(stderr, "lexure failure\n");
             return -1;
         }
+
         printf("=== TOKENS ===\n");
-        for (size_t i = 0; i < tokens.length(); i++) {
-            token_print(tokens[i]);
+        for (const Token& t : tokens) {
+            token_print(t);
         }
+
         return 0;
     }
 

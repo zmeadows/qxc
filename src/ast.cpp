@@ -30,13 +30,21 @@
 // <unary_op> ::= "!" | "~" | "-"
 
 struct Parser {
+    DynHeapArray<Token> token_buffer;
     struct qxc_memory_pool* pool;
-    DynArray<Token> token_buffer;
     size_t itoken;
-
-    // TODO: remove memory pool from Parser struct
-    Parser(void) : pool(qxc_memory_pool_init(1e3)), itoken(0) {}
 };
+
+static Parser parser_create(void)
+{
+    Parser parser;
+    parser.pool = qxc_memory_pool_init(10e3);
+    parser.token_buffer = heap_array_create<Token>(0);
+    parser.itoken = 0;
+    return parser;
+}
+
+static void parser_destroy(Parser* parser) { array_free(&parser->token_buffer); }
 
 #define EXPECT(EXPR, ...)                                                  \
     do {                                                                   \
@@ -65,7 +73,7 @@ struct Parser {
 
 static Token* pop_next_token(Parser* parser)
 {
-    if (parser->itoken < parser->token_buffer.length()) {
+    if (parser->itoken < parser->token_buffer.length) {
         return &parser->token_buffer[parser->itoken++];
     }
     else {
@@ -75,7 +83,7 @@ static Token* pop_next_token(Parser* parser)
 
 static Token* peek_next_token(Parser* parser)
 {
-    if (parser->itoken < parser->token_buffer.length()) {
+    if (parser->itoken < parser->token_buffer.length) {
         return &parser->token_buffer[parser->itoken];
     }
     else {
@@ -411,11 +419,11 @@ static StatementNode* parse_statement(Parser* parser)
         statement->type = StatementType::Compound;
 
         // TODO: abstract out to parse_block_item_list
-        statement->compound_statement_block_items = DynArray<BlockItemNode*>(4);
+        statement->block_items = array_create<BlockItemNode*, 8>();
         while (peek_next_token(parser)->type != TokenType::CloseBrace) {
             BlockItemNode* next_block_item = parse_block_item(parser);
             EXPECT(next_block_item, "Failed to parse block item in function: main");
-            statement->compound_statement_block_items.append(next_block_item);
+            array_append(&statement->block_items, next_block_item);
             debug_print("successfully parsed block item");
         }
 
@@ -483,7 +491,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
     while (peek_next_token(parser)->type != TokenType::CloseBrace) {
         BlockItemNode* next_block_item = parse_block_item(parser);
         EXPECT(next_block_item, "Failed to parse block item in function: main");
-        decl->blist.append(next_block_item);
+        array_append(&decl->block_items, next_block_item);
         debug_print("successfully parsed block item");
     }
 
@@ -495,7 +503,8 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
 Program* parse_program(const char* filepath)
 {
-    Parser parser;
+    Parser parser = parser_create();
+    defer { parser_destroy(&parser); };
 
     if (tokenize(&parser.token_buffer, filepath) != 0) {
         return nullptr;

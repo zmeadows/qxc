@@ -444,7 +444,7 @@ void generate_asm(Program* program, const char* output_filepath)
     StackOffsets offsets;
 
     if (program->main_decl != nullptr) {
-        for (BlockItemNode* b : program->main_decl->blist) {
+        for (BlockItemNode* b : program->main_decl->block_items) {
             generate_block_item_asm(&gen, &offsets, b);
         }
     }

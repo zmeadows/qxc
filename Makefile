@@ -9,7 +9,7 @@ OBJDIR = obj
 SRCDIR = src
 
 # Libraries
-MYCFLAGS = -std=c++11 \
+MYCFLAGS = -std=c++17 \
 		   -Wall \
 		   -Wextra \
 		   -Wconversion \

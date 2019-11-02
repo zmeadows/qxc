@@ -36,6 +36,8 @@ struct ExprNode {
         struct CondExpr cond_expr;
         const char* referenced_var_name;
     };
+
+    ExprNode() {}
 };
 
 // --------------------------------------------------------------------------------
@@ -58,9 +60,11 @@ struct StatementNode {
     union {
         ExprNode* return_expr;
         IfElseStatement* ifelse_statement;
-        DynArray<BlockItemNode*> compound_statement_block_items;
+        DynArray<BlockItemNode*, 8> block_items;
         ExprNode* standalone_expr;
     };
+
+    StatementNode() {}
 };
 
 // --------------------------------------------------------------------------------
@@ -87,7 +91,7 @@ struct BlockItemNode {
 
 struct FunctionDecl {
     const char* name = nullptr;
-    DynArray<BlockItemNode*> blist;
+    DynArray<BlockItemNode*, 16> block_items;
 };
 
 // --------------------------------------------------------------------------------

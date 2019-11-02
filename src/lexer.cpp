@@ -182,10 +182,10 @@ static inline bool is_valid_symbol(char c)
     return c != '\0' && strchr("{}();", c) != nullptr;
 }
 
-static void build_symbol_token(Tokenizer* tokenizer, DynArray<Token>* token_buffer,
+static void build_symbol_token(Tokenizer* tokenizer, DynHeapArray<Token>* token_buffer,
                                char c)
 {
-    Token* new_token = token_buffer->append();
+    Token* new_token = array_extend(token_buffer);
     new_token->line = tokenizer->current_line;
     new_token->column = tokenizer->current_column;
 
@@ -212,16 +212,16 @@ static void build_symbol_token(Tokenizer* tokenizer, DynArray<Token>* token_buff
 }
 
 static inline void consume_symbol_token(Tokenizer* tokenizer,
-                                        DynArray<Token>* token_buffer)
+                                        DynHeapArray<Token>* token_buffer)
 {
     build_symbol_token(tokenizer, token_buffer, tokenizer->next_char);
     tokenizer_advance(tokenizer);
 }
 
-static void build_operator_token(Tokenizer* tokenizer, DynArray<Token>* token_buffer,
+static void build_operator_token(Tokenizer* tokenizer, DynHeapArray<Token>* token_buffer,
                                  Operator op)
 {
-    Token* new_token = token_buffer->append();
+    Token* new_token = array_extend(token_buffer);
     new_token->type = TokenType::Operator;
     new_token->op = op;
     new_token->line = tokenizer->current_line;
@@ -229,16 +229,16 @@ static void build_operator_token(Tokenizer* tokenizer, DynArray<Token>* token_bu
 }
 
 // 'consume' == build + advance tokenizer
-static void consume_operator_token(Tokenizer* tokenizer, DynArray<Token>* token_buffer,
-                                   Operator op)
+static void consume_operator_token(Tokenizer* tokenizer,
+                                   DynHeapArray<Token>* token_buffer, Operator op)
 {
     build_operator_token(tokenizer, token_buffer, op);
     tokenizer_advance(tokenizer);
 }
 
-int tokenize(DynArray<Token>* token_buffer, const char* filepath)
+int tokenize(DynHeapArray<Token>* token_buffer, const char* filepath)
 {
-    token_buffer->clear();
+    array_clear(token_buffer);
 
     Tokenizer tokenizer;
 
@@ -251,7 +251,7 @@ int tokenize(DynArray<Token>* token_buffer, const char* filepath)
         if (is_valid_keyword_identifier_first_character(tokenizer.next_char)) {
             tokenizer_consume_id(&tokenizer);
 
-            Token* new_token = token_buffer->append();
+            Token* new_token = array_extend(token_buffer);
 
             Keyword keyword = str_to_keyword(tokenizer.id);
 
@@ -326,7 +326,7 @@ int tokenize(DynArray<Token>* token_buffer, const char* filepath)
                 return -1;
             }
 
-            Token* new_token = token_buffer->append();
+            Token* new_token = array_extend(token_buffer);
             new_token->type = TokenType::IntLiteral;
             new_token->line = tokenizer.current_line;
             new_token->column = tokenizer.current_column - tokenizer.id_len;

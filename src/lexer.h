@@ -4,4 +4,4 @@
 #include "prelude.h"
 #include "token.h"
 
-int tokenize(DynArray<Token>* token_buffer, const char* filepath);
+int tokenize(DynHeapArray<Token>* token_buffer, const char* filepath);

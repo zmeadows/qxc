@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <utility>
+
 struct qxc_memory_pool {
     struct qxc_memory_arena_chain* chain_tip;
     size_t arena_size;
@@ -20,8 +22,8 @@ void qxc_memory_pool_release(struct qxc_memory_pool* pool);
 void allocate_arena_chain_link(struct qxc_memory_pool* pool);
 char* qxc_malloc_str(struct qxc_memory_pool* pool, size_t bytes);
 
-template <typename T>
-T* qxc_malloc(struct qxc_memory_pool* pool)
+template <typename T, typename... Args>
+T* qxc_malloc(struct qxc_memory_pool* pool, Args&&... args)
 {
     struct qxc_memory_arena_chain* tip = pool->chain_tip;
 
@@ -29,6 +31,7 @@ T* qxc_malloc(struct qxc_memory_pool* pool)
     while (1) {
         if (tip->bump_ptr + sizeof(T) < tip->end) {
             T* reserved_memory = (T*)(pool->chain_tip->bump_ptr);
+            new (reserved_memory) T(std::forward<Args>(args)...);
             tip->bump_ptr += sizeof(T);
             return reserved_memory;
         }

@@ -122,7 +122,7 @@ static void print_statement(StatementNode* statement)
             PPRINT("CompoundStatement:\n");
             indent_level++;
 
-            for (BlockItemNode* b : statement->compound_statement_block_items) {
+            for (BlockItemNode* b : statement->block_items) {
                 print_block_item(b);
             }
 
@@ -160,16 +160,16 @@ static void print_block_item(BlockItemNode* block_item)
     }
 }
 
-static void print_function_decl(FunctionDecl* node)
+static void print_function_decl(FunctionDecl* decl)
 {
-    PPRINT("FUNC NAME: %s\n", node->name);
+    PPRINT("FUNC NAME: %s\n", decl->name);
     indent_level++;
     PPRINT("FUNC RETURN TYPE: Int\n");
     PPRINT("PARAMS: ()\n");
     PPRINT("BODY:\n");
     indent_level++;
 
-    for (BlockItemNode* b : node->blist) {
+    for (BlockItemNode* b : decl->block_items) {
         print_block_item(b);
     }
 
